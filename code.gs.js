@@ -226,8 +226,6 @@ function setCurrentCard(cardVal) {
     .setValue(cardVal);
 }
 
-function formatCurrentCard(cardVal) {}
-
 function getCurrentTokens() {
   const tokenStr = getCellValue(TOKENS_POOL_A1);
   return tokenStr != null ? tokenStr.length / TOKEN_REPR.length : null;
