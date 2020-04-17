@@ -1,12 +1,23 @@
 /** @OnlyCurrentDoc */
 
+/**
+ * Game's rules consts
+ */
 const MAX_PLAYER_COUNT = 7;
-const PLAYER1_ROW = 20;
 const MIN_CARD = 3;
 const MAX_CARD = 35;
 const SETUP_CARDS_REMOVED = 9;
-const TOKEN_REPR = "🌑 ";
+
+/**
+ * UI consts
+ */
+const CARD_SIZE = 9;
+const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
+const BG_COLOR = "#fff3dc";
+const PLAYER1_ROW = 17;
+const CURRENT_CARD_A1 = "N2";
+const TOKENS_POOL_A1 = "F12";
 
 function onOpen() {
   SpreadsheetApp.getUi()
@@ -87,7 +98,7 @@ function newGame() {
 }
 
 function drawCard(deck) {
-  const randIndex = randInt(deck.length);
+  const randIndex = randInt(deck.length - 1);
   const card = deck[randIndex];
 
   // Remove the card in-place
@@ -159,37 +170,72 @@ function getDeck() {
 }
 
 function setDeck(deck) {
-  const sheet = SpreadsheetApp.getActiveSheet();
-
   if (deck == null) {
     resetSheetMetadataObject("deck");
-    sheet.getRange("C1").clearContent();
     return;
   }
 
   const serialized = JSON.stringify(deck);
   getSheetMetadataObject("deck").setValue(serialized);
-
-  sheet.getRange("C1").setValue(deck.length);
 }
 
 function getCurrentCard() {
-  const cardStr = getCellValue("N2");
+  const currentCardA1 = SpreadsheetApp.getActiveSheet()
+    .getRange(CURRENT_CARD_A1)
+    .offset(1, 1)
+    .getA1Notation();
+  const cardStr = getCellValue(currentCardA1);
   return cardStr != null ? parseInt(cardStr) : null;
 }
 
 function setCurrentCard(cardVal) {
-  setCellValue("N2", cardVal);
+  const cardRange = SpreadsheetApp.getActiveSheet()
+    .getRange(CURRENT_CARD_A1)
+    .offset(0, 0, CARD_SIZE, CARD_SIZE);
+
+  if (cardVal == null) {
+    cardRange
+      .breakApart()
+      .clear()
+      .setBackground(BG_COLOR)
+      .setBorder(false, false, false, false, false, false);
+    return;
+  }
+
+  cardRange
+    .setBackground("red")
+    .setBorder(
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      "white",
+      SpreadsheetApp.BorderStyle.SOLID_THICK,
+    )
+    .offset(1, 1, CARD_SIZE - 2, CARD_SIZE - 2)
+    .merge()
+    .setBackground("white")
+    .setFontColor("blue")
+    .setFontFamily("Impact")
+    .setFontSize(96)
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle")
+    .setValue(cardVal);
 }
 
+function formatCurrentCard(cardVal) {}
+
 function getCurrentTokens() {
-  const tokenStr = getCellValue("F12");
+  const tokenStr = getCellValue(TOKENS_POOL_A1);
   return tokenStr != null ? tokenStr.length / TOKEN_REPR.length : null;
 }
 
 function setCurrentTokens(tokens) {
   const tokensStr = TOKEN_REPR.repeat(tokens);
-  setCellValue("F12", tokensStr);
+  setCellValue(TOKENS_POOL_A1, tokensStr);
 }
 
 function getActivePlayer() {
