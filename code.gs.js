@@ -11,15 +11,24 @@ const SETUP_CARDS_REMOVED = 9;
 /**
  * UI consts
  */
-const CARD_SIZE = 9;
+const CARD_SIZE = 10;
 const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
 const BG_COLOR = "#fff3dc";
-const PLAYER1_ROW = 17;
-const CURRENT_CARD_A1 = "N2";
-const TOKENS_POOL_A1 = "F12";
+const PLAYER1_ROW = 18;
+const DECK_A1 = "D2";
+const CURRENT_CARD_A1 = "P2";
+const TOKENS_POOL_A1 = "E13";
+
+/**
+ * Mechanism consts
+ */
+const MUTEX_LOCKOUT_PERIOD_MS = 5000;
 
 function onOpen() {
+  // Remove any previous locks
+  resetSheetMedatadata("lock");
+
   SpreadsheetApp.getUi()
     .createMenu("No Thanks")
     .addItem("New Game", "newGame")
@@ -27,74 +36,82 @@ function onOpen() {
 }
 
 function revealTopCard() {
-  if (getCurrentCard() != null) {
-    Browser.msgBox(
-      "You can't reveal the next card until the current card is taken!",
-    );
-    return;
-  }
+  singleEntry(() => {
+    if (getCurrentCard() != null) {
+      Browser.msgBox(
+        "You can't reveal the next card until the current card is taken!",
+      );
+      return;
+    }
 
-  const deck = getDeck();
-  if (deck.length === 0) {
-    Browser.msgBox("Deck is empty!");
-    return;
-  }
+    const deck = getDeck();
+    if (deck.length === 0) {
+      Browser.msgBox("Deck is empty!");
+      return;
+    }
 
-  const { remainingDeck, card } = drawCard(deck);
-  setCurrentCard(card);
-  setDeck(remainingDeck);
-  setCurrentTokens(0);
+    const { remainingDeck, card } = drawCard(deck);
+    setCurrentCard(card);
+    setDeck(remainingDeck);
+    setCurrentTokens(0);
+  });
 }
 
 function takeCard() {
-  const card = getCurrentCard();
-  const tokens = getCurrentTokens();
-  if (card == null) {
-    Browser.msgBox("No card revealed yet to take");
-    return;
-  }
-  setCurrentCard(null);
-  setCurrentTokens(null);
+  singleEntry(() => {
+    const card = getCurrentCard();
+    const tokens = getCurrentTokens();
+    if (card == null) {
+      Browser.msgBox("No card revealed yet to take");
+      return;
+    }
+    setCurrentCard(null);
+    setCurrentTokens(null);
 
-  player = getActivePlayer();
-  addCardToPlayer(player, card);
-  addTokensToPlayer(player, tokens);
+    player = getActivePlayer();
+    addCardToPlayer(player, card);
+    addTokensToPlayer(player, tokens);
+  });
 }
 
 function noThanks() {
-  const currentCard = getCurrentCard();
-  if (currentCard == null) {
-    Browser.msgBox("No card revealed yet!");
-    return;
-  }
+  singleEntry(() => {
+    const currentCard = getCurrentCard();
+    if (currentCard == null) {
+      Browser.msgBox("No card revealed yet!");
+      return;
+    }
 
-  // Take token from player
-  addTokensToPlayer(getActivePlayer(), -1);
+    // Take token from player
+    addTokensToPlayer(getActivePlayer(), -1);
 
-  // And add it to the pool
-  setCurrentTokens(getCurrentTokens() + 1);
-  advanceActivePlayer();
+    // And add it to the pool
+    setCurrentTokens(getCurrentTokens() + 1);
+    advanceActivePlayer();
+  });
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
 
 function newGame() {
-  setDeck(null);
-  setPlayerTokens(null);
-  setCurrentCard(null);
-  setCurrentTokens(null);
-  resetPlayerCards();
+  singleEntry(() => {
+    setDeck(null);
+    setPlayerTokens(null);
+    setCurrentCard(null);
+    setCurrentTokens(null);
+    resetPlayerCards();
 
-  const playerCount = getPlayerCount();
+    const playerCount = getPlayerCount();
 
-  // Pick a random starting player
-  setActivePlayer(randInt(playerCount - 1));
+    // Pick a random starting player
+    setActivePlayer(randInt(playerCount - 1));
 
-  // deal tokens to each player
-  dealTokens(playerCount);
+    // deal tokens to each player
+    dealTokens(playerCount);
 
-  // Recreate the starting deck
-  setDeck(newDeck());
+    // Recreate the starting deck
+    setDeck(newDeck());
+  });
 }
 
 function drawCard(deck) {
@@ -170,13 +187,37 @@ function getDeck() {
 }
 
 function setDeck(deck) {
-  if (deck == null) {
+  const cardRange = SpreadsheetApp.getActiveSheet()
+    .getRange(DECK_A1)
+    .offset(0, 0, CARD_SIZE, CARD_SIZE);
+
+  if (deck == null || deck.length === 0) {
     resetSheetMetadataObject("deck");
+
+    cardRange
+      .breakApart()
+      .clear()
+      .setBackground(BG_COLOR)
+      .setBorder(false, false, false, false, false, false);
     return;
   }
 
   const serialized = JSON.stringify(deck);
   getSheetMetadataObject("deck").setValue(serialized);
+
+  cardRange
+    .merge()
+    .setBackground("white")
+    .setBorder(
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      "white",
+      SpreadsheetApp.BorderStyle.SOLID_THICK,
+    );
 }
 
 function getCurrentCard() {
@@ -342,6 +383,35 @@ function setCellValue(a1Notation, value) {
     cell.clearContent();
   }
   cell.setValue(value);
+}
+
+function singleEntry(func) {
+  const metadata = getSheetMetadataObject("lock");
+  const timeoutStr = metadata.getValue();
+  const timestamp = new Date().getTime();
+
+  if (timeoutStr !== "") {
+    if (parseInt(timeoutStr) > timestamp) {
+      Browser.msgBox("Lock active, previous operation hasn't completed yet");
+      return;
+    } else {
+      Browser.msgBox(
+        "Previous lock wasn't cleared but we are out of the lockout period. Timeout was: " +
+          timeoutStr +
+          ", Timestamp is: " +
+          timestamp,
+      );
+    }
+  }
+
+  metadata.setValue(timestamp + MUTEX_LOCKOUT_PERIOD_MS);
+
+  try {
+    func();
+  } finally {
+    // Release the lock
+    resetSheetMetadataObject("lock");
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////
