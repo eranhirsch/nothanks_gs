@@ -15,6 +15,7 @@ const CARD_SIZE = 10;
 const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
 const BG_COLOR = "#fff3dc";
+const DECK_BACK_COLOR = "#1c4587";
 const PLAYER1_ROW = 18;
 const DECK_A1 = "D2";
 const CURRENT_CARD_A1 = "P2";
@@ -23,11 +24,11 @@ const TOKENS_POOL_A1 = "E13";
 /**
  * Mechanism consts
  */
-const MUTEX_LOCKOUT_PERIOD_MS = 5000;
+const MUTEX_LOCKOUT_PERIOD_MS = 50000;
 
 function onOpen() {
   // Remove any previous locks
-  resetSheetMedatadata("lock");
+  resetSheetMetadataObject("lock");
 
   SpreadsheetApp.getUi()
     .createMenu("No Thanks")
@@ -205,9 +206,21 @@ function setDeck(deck) {
   const serialized = JSON.stringify(deck);
   getSheetMetadataObject("deck").setValue(serialized);
 
+  const noTextStyle = SpreadsheetApp.newTextStyle()
+    .setBold(true)
+    .setFontFamily("Francois One")
+    .setFontSize(65)
+    .setForegroundColor("red")
+    .build();
+  const thanksTextStyle = noTextStyle.copy().setFontSize(20).build();
+  const noThanksRichTextValue = SpreadsheetApp.newRichTextValue()
+    .setText("NO\nTHANKS!")
+    .setTextStyle(0, 2, noTextStyle)
+    .setTextStyle(3, 10, thanksTextStyle)
+    .build();
+
   cardRange
-    .merge()
-    .setBackground("white")
+    .setBackground(DECK_BACK_COLOR)
     .setBorder(
       true,
       true,
@@ -217,7 +230,13 @@ function setDeck(deck) {
       false,
       "white",
       SpreadsheetApp.BorderStyle.SOLID_THICK,
-    );
+    )
+    .offset(2, 2, 4, CARD_SIZE - 4)
+    .merge()
+    .setBackground("white")
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("bottom")
+    .setRichTextValue(noThanksRichTextValue);
 }
 
 function getCurrentCard() {
@@ -390,10 +409,9 @@ function singleEntry(func) {
   const timeoutStr = metadata.getValue();
   const timestamp = new Date().getTime();
 
-  if (timeoutStr !== "") {
+  if (timeoutStr != "") {
     if (parseInt(timeoutStr) > timestamp) {
-      Browser.msgBox("Lock active, previous operation hasn't completed yet");
-      return;
+      throw new Error("Lock active, previous operation hasn't completed yet");
     } else {
       Browser.msgBox(
         "Previous lock wasn't cleared but we are out of the lockout period. Timeout was: " +
