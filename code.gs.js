@@ -252,7 +252,7 @@ function setCurrentCard(cardVal) {
     return;
   }
 
-  renderCard(cardRange);
+  renderCard(cardRange).setValue(cardVal);
 }
 
 function getCurrentTokens() {
@@ -394,7 +394,7 @@ function renderDeck(cardRange) {
 }
 
 function renderCard(cardRange) {
-  cardRange
+  return cardRange
     .setBackground("red")
     .setBorder(
       true,
@@ -414,8 +414,7 @@ function renderCard(cardRange) {
     .setFontSize(96)
     .setFontWeight("bold")
     .setHorizontalAlignment("center")
-    .setVerticalAlignment("middle")
-    .setValue(cardVal);
+    .setVerticalAlignment("middle");
 }
 
 ////// GENERIC SHEET HELPERS ///////////////////////////////////////////////////
