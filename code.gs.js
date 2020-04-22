@@ -174,7 +174,8 @@ function advanceActivePlayer() {
 function addTokensToPlayer(player, tokens) {
   const playerTokens = getPlayerTokens();
 
-  const newPlayerTokensCount = playerTokens[player] + tokens;
+  const playersTokens = player in playerTokens ? playerTokens[player] : 0;
+  const newPlayerTokensCount = playersTokens + tokens;
   if (newPlayerTokensCount < 0) {
     throw new Error("The player doesn't have any tokens left!");
   }
