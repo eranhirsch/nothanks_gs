@@ -271,7 +271,7 @@ function setCurrentCard(cardVal) {
     return;
   }
 
-  renderCard(cardRange).setValue(cardVal);
+  renderCard(cardRange, cardVal);
 }
 
 function getCurrentTokens() {
@@ -418,9 +418,9 @@ function renderDeck(cardRange) {
     .setRichTextValue(noThanksRichTextValue);
 }
 
-function renderCard(cardRange) {
+function renderCard(cardRange, cardVal) {
   return cardRange
-    .setBackground("red")
+    .setBackground(cardBorderColor(cardVal))
     .setBorder(
       true,
       true,
@@ -434,12 +434,95 @@ function renderCard(cardRange) {
     .offset(1, 1, CARD_SIZE - 2, CARD_SIZE - 2)
     .merge()
     .setBackground("white")
-    .setFontColor("blue")
+    .setFontColor(cardNumberColor(cardVal))
     .setFontFamily("Impact")
     .setFontSize(96)
     .setFontWeight("bold")
     .setHorizontalAlignment("center")
-    .setVerticalAlignment("middle");
+    .setVerticalAlignment("middle")
+    .setValue(cardVal);
+}
+
+function cardNumberColor(cardVal) {
+  return (
+    "#" +
+    [
+      "00DBDB",
+      "00D9C5",
+      "00D7B0",
+      "00D69B",
+      "00D486",
+      "00D372",
+      "00D15E",
+      "00CF4A",
+      "00CE37",
+      "00CC24",
+      "00CB11",
+      "01C900",
+      "13C700",
+      "25C600",
+      "37C400",
+      "48C300",
+      "59C100",
+      "6ABF00",
+      "7BBE00",
+      "8BBC00",
+      "9BBB00",
+      "ABB900",
+      "B7B500",
+      "B6A300",
+      "B49100",
+      "B37F00",
+      "B16E00",
+      "AF5D00",
+      "AE4C00",
+      "AC3B00",
+      "AB2B00",
+      "A91B00",
+      "A80B00",
+    ][cardVal - 3]
+  );
+}
+
+function cardBorderColor(cardVal) {
+  return (
+    "#" +
+    [
+      "FFD90F",
+      "FBED0E",
+      "EEF70D",
+      "D4F30D",
+      "BBEF0D",
+      "A3EB0C",
+      "8BE70C",
+      "74E30B",
+      "5DDF0B",
+      "48DB0A",
+      "33D70A",
+      "1ED409",
+      "0AD009",
+      "09CC1A",
+      "08C82C",
+      "08C43C",
+      "07C04D",
+      "07BC5C",
+      "07B86B",
+      "06B47A",
+      "06B087",
+      "06AC94",
+      "05A9A0",
+      "059DA5",
+      "058BA1",
+      "04799D",
+      "046899",
+      "045795",
+      "044791",
+      "03388D",
+      "032989",
+      "031C85",
+      "030F82",
+    ][cardVal - 3]
+  );
 }
 
 ////// GENERIC SHEET HELPERS ///////////////////////////////////////////////////
