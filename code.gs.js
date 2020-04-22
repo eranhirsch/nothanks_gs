@@ -317,7 +317,7 @@ function resetPlayerCards() {
 
 function getPlayerTokens() {
   const serialized = getSheetMetadataObject("playerTokens").getValue();
-  return JSON.parse(serialized);
+  return serialized !== "" ? JSON.parse(serialized) : {};
 }
 
 function setPlayerTokens(playerTokens) {
@@ -471,7 +471,7 @@ function singleEntry(func) {
     } else {
       Browser.msgBox(
         "Previous lock wasn't cleared but we are out of the lockout period." +
-        "Timeout was: " +
+          "Timeout was: " +
           timeoutStr +
           ", Timestamp is: " +
           timestamp,
