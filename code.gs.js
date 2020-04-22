@@ -87,7 +87,21 @@ function takeCard() {
 
     player = getActivePlayer();
     addCardToPlayer(player, card);
-    addTokensToPlayer(player, tokens);
+
+    if (tokens > 0) {
+      Browser.msgBox(
+        "Take Tokens",
+        "Player " +
+          (player + 1) +
+          ": Add " +
+          tokens +
+          " token" +
+          (tokens === 1 ? "" : "s") +
+          " to your pool",
+        Browser.Buttons.OK,
+      );
+      addTokensToPlayer(player, tokens);
+    }
 
     const deck = getDeck();
     if (deck != null && deck.length > 0) {
@@ -177,7 +191,9 @@ function addTokensToPlayer(player, tokens) {
   const playersTokens = player in playerTokens ? playerTokens[player] : 0;
   const newPlayerTokensCount = playersTokens + tokens;
   if (newPlayerTokensCount < 0) {
-    throw new Error("The player doesn't have any tokens left!");
+    throw new Error(
+      "Player #" + (player + 1) + "doesn't have any tokens left!",
+    );
   }
   playerTokens[player] = newPlayerTokensCount;
 
@@ -194,6 +210,11 @@ function dealTokens(playerCount) {
     tokens = 7;
   }
 
+  Browser.msgBox(
+    "Take Tokens",
+    "All Players: Add " + tokens + " tokens to your pool",
+    Browser.Buttons.OK,
+  );
   range(playerCount - 1).forEach((player) => addTokensToPlayer(player, tokens));
 }
 
