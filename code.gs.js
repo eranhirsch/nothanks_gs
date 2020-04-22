@@ -91,8 +91,7 @@ function takeCard() {
     if (tokens > 0) {
       Browser.msgBox(
         "Take Tokens",
-        "Player " +
-          (player + 1) +
+        getPlayerName(player) +
           ": Add " +
           tokens +
           " token" +
@@ -191,9 +190,7 @@ function addTokensToPlayer(player, tokens) {
   const playersTokens = player in playerTokens ? playerTokens[player] : 0;
   const newPlayerTokensCount = playersTokens + tokens;
   if (newPlayerTokensCount < 0) {
-    throw new Error(
-      "Player #" + (player + 1) + "doesn't have any tokens left!",
-    );
+    throw new Error(getPlayerName(player) + " doesn't have any tokens left!");
   }
   playerTokens[player] = newPlayerTokensCount;
 
@@ -300,6 +297,12 @@ function setActivePlayer(player) {
   const sheet = SpreadsheetApp.getActiveSheet();
   sheet.getRange(PLAYER1_ROW, 1, MAX_PLAYER_COUNT, 1).clearContent();
   sheet.getRange(PLAYER1_ROW + player, 1).setValue(ACTIVE_PLAYER_MARKER);
+}
+
+function getPlayerName(player) {
+  return SpreadsheetApp.getActiveSheet()
+    .getRange(PLAYER1_ROW + player, 2)
+    .getValue();
 }
 
 function getPlayerCount() {
