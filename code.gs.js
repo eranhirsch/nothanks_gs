@@ -297,9 +297,13 @@ function getActivePlayer() {
 }
 
 function setActivePlayer(player) {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  sheet.getRange(PLAYER1_A1).offset(0, -1, MAX_PLAYER_COUNT, 1).clearContent();
-  sheet.getRange(PLAYER1_A1).offset(player, -1).setValue(ACTIVE_PLAYER_MARKER);
+  renderActivePlayerMarker(
+    SpreadsheetApp.getActiveSheet()
+      .getRange(PLAYER1_A1)
+      .offset(0, -1, MAX_PLAYER_COUNT, 1)
+      .clearContent()
+      .offset(player, 0, 1, 1),
+  );
 }
 
 function getPlayerName(player) {
@@ -437,7 +441,9 @@ function renderCurrentCard(cardRange, cardVal) {
       .offset(1, 1, CARD_SIZE - 2, CARD_SIZE - 2)
       .merge(),
     cardVal,
-  ).setFontSize(96);
+  )
+    .setFontSize(96)
+    .setFontWeight("bold");
 }
 
 function renderPlayerCard(cardRange, cardVal) {
@@ -453,7 +459,7 @@ function renderPlayerCard(cardRange, cardVal) {
       SpreadsheetApp.BorderStyle.SOLID_THICK,
     ),
     cardVal,
-  ).setFontSize(11);
+  ).setFontSize(12);
 }
 
 function renderCard(cardRange, cardVal) {
@@ -461,7 +467,6 @@ function renderCard(cardRange, cardVal) {
     .setBackground("white")
     .setFontColor(cardNumberColor(cardVal))
     .setFontFamily(FONT_FAMILY)
-    .setFontWeight("bold")
     .setHorizontalAlignment("center")
     .setVerticalAlignment("middle")
     .setValue(cardVal);
@@ -470,7 +475,7 @@ function renderCard(cardRange, cardVal) {
 function resetPlayerCards() {
   SpreadsheetApp.getActiveSheet()
     .getRange(PLAYER1_A1)
-    .offset(0, PLAYER_NAME_LENGTH, MAX_PLAYER_COUNT, 24)
+    .offset(0, PLAYER_NAME_LENGTH, MAX_PLAYER_COUNT, 25)
     .setBackground(BG_COLOR)
     .setBorder(
       true,
@@ -483,6 +488,14 @@ function resetPlayerCards() {
       SpreadsheetApp.BorderStyle.SOLID_THICK,
     )
     .clearContent();
+}
+
+function renderActivePlayerMarker(range) {
+  return range
+    .setFontSize(14)
+    .setVerticalAlignment("middle")
+    .setHorizontalAlignment("center")
+    .setValue(ACTIVE_PLAYER_MARKER);
 }
 
 function cardNumberColor(cardVal) {
