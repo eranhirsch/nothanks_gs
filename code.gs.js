@@ -486,83 +486,54 @@ function resetPlayerCards() {
 }
 
 function cardNumberColor(cardVal) {
-  return (
-    "#" +
-    [
-      "00DBDB",
-      "00D9C5",
-      "00D7B0",
-      "00D69B",
-      "00D486",
-      "00D372",
-      "00D15E",
-      "00CF4A",
-      "00CE37",
-      "00CC24",
-      "00CB11",
-      "01C900",
-      "13C700",
-      "25C600",
-      "37C400",
-      "48C300",
-      "59C100",
-      "6ABF00",
-      "7BBE00",
-      "8BBC00",
-      "9BBB00",
-      "ABB900",
-      "B7B500",
-      "B6A300",
-      "B49100",
-      "B37F00",
-      "B16E00",
-      "AF5D00",
-      "AE4C00",
-      "AC3B00",
-      "AB2B00",
-      "A91B00",
-      "A80B00",
-    ][cardVal - 3]
-  );
+  if (cardVal >= 3 && cardVal <= 13) {
+    return "#0586ff";
+  } else if (cardVal >= 14 && cardVal <= 24) {
+    return "#ff9d14";
+  } else if (cardVal >= 15 && cardVal <= 35) {
+    return "#d11500";
+  }
+
+  throw new Error("No color defined for card value " + cardVal);
 }
 
 function cardBorderColor(cardVal) {
   return (
     "#" +
     [
-      "FFD90F",
-      "FBED0E",
-      "EEF70D",
-      "D4F30D",
-      "BBEF0D",
-      "A3EB0C",
-      "8BE70C",
-      "74E30B",
-      "5DDF0B",
-      "48DB0A",
-      "33D70A",
-      "1ED409",
-      "0AD009",
-      "09CC1A",
-      "08C82C",
-      "08C43C",
-      "07C04D",
-      "07BC5C",
-      "07B86B",
-      "06B47A",
-      "06B087",
-      "06AC94",
-      "05A9A0",
-      "059DA5",
-      "058BA1",
-      "04799D",
-      "046899",
-      "045795",
-      "044791",
-      "03388D",
-      "032989",
-      "031C85",
-      "030F82",
+      "FFE541",
+      "FCF93D",
+      "E5F938",
+      "CBF734",
+      "B1F42F",
+      "96F12B",
+      "7BEF27",
+      "5FEC22",
+      "43EA1E",
+      "27E71A",
+      "16E422",
+      "13E237",
+      "0FDF4C",
+      "0BDC61",
+      "07DA77",
+      "04D78D",
+      "00D5A3",
+      "00D0B0",
+      "00CCBD",
+      "00C8C8",
+      "00B5C4",
+      "00A2C0",
+      "0090BC",
+      "007FB8",
+      "006EB4",
+      "005EB0",
+      "004FAC",
+      "0040A8",
+      "0031A4",
+      "0024A0",
+      "00179C",
+      "000A98",
+      "010094",
     ][cardVal - 3]
   );
 }
