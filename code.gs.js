@@ -16,9 +16,11 @@ const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
 const BG_COLOR = "#fff3dc";
 const DECK_BACK_COLOR = "#1c4587";
-const PLAYER1_ROW = 18;
+const PLAYER1_A1 = "Z6";
 const CELL_DIMENSION = { WIDTH: 21, HEIGHT: 30 };
-const LOCATION_A1 = { DECK: "D2", CARD: "P2", TOKENS: "E13" };
+const LOCATION_A1 = { DECK: "B2", CARD: "N2", TOKENS: "C13" };
+const PLAYER_NAME_LENGTH = 5;
+const FONT_FAMILY = "Francois One";
 
 // Our calculation of hotspot width seems to miss by a bit so we can just expand
 // it a little by a constant factor to try and fix it.
@@ -75,11 +77,12 @@ function revealTopCard() {
 function takeCard() {
   singleEntry(() => {
     const card = getCurrentCard();
-    const tokens = getCurrentTokens();
     if (card == null) {
-      Browser.msgBox("No card revealed yet to take");
-      return;
+      throw new Error("No card revealed yet to take");
     }
+
+    const tokens = getCurrentTokens();
+
     resetHotspot("CARD");
     setCurrentCard(null);
     resetHotspot("TOKENS");
@@ -271,7 +274,7 @@ function setCurrentCard(cardVal) {
     return;
   }
 
-  renderCard(cardRange, cardVal);
+  renderCurrentCard(cardRange, cardVal);
 }
 
 function getCurrentTokens() {
@@ -285,29 +288,31 @@ function setCurrentTokens(tokens) {
 }
 
 function getActivePlayer() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  const activeMarkerCell = sheet
-    .getRange(PLAYER1_ROW, 1, MAX_PLAYER_COUNT, 1)
+  const player1Cell = SpreadsheetApp.getActiveSheet().getRange(PLAYER1_A1);
+  const activeMarkerCell = player1Cell
+    .offset(0, -1, MAX_PLAYER_COUNT, 1)
     .createTextFinder(ACTIVE_PLAYER_MARKER)
     .findNext();
-  return activeMarkerCell.getRow() - PLAYER1_ROW;
+  return activeMarkerCell.getRow() - player1Cell.getRow();
 }
 
 function setActivePlayer(player) {
   const sheet = SpreadsheetApp.getActiveSheet();
-  sheet.getRange(PLAYER1_ROW, 1, MAX_PLAYER_COUNT, 1).clearContent();
-  sheet.getRange(PLAYER1_ROW + player, 1).setValue(ACTIVE_PLAYER_MARKER);
+  sheet.getRange(PLAYER1_A1).offset(0, -1, MAX_PLAYER_COUNT, 1).clearContent();
+  sheet.getRange(PLAYER1_A1).offset(player, -1).setValue(ACTIVE_PLAYER_MARKER);
 }
 
 function getPlayerName(player) {
   return SpreadsheetApp.getActiveSheet()
-    .getRange(PLAYER1_ROW + player, 2)
+    .getRange(PLAYER1_A1)
+    .offset(player, 0)
     .getValue();
 }
 
 function getPlayerCount() {
   const playerNames = SpreadsheetApp.getActiveSheet()
-    .getRange(PLAYER1_ROW, 2, MAX_PLAYER_COUNT, 1)
+    .getRange(PLAYER1_A1)
+    .offset(0, 0, MAX_PLAYER_COUNT, 1)
     .getValues()
     .map((row) => row[0])
     .filter((name) => name !== "");
@@ -315,29 +320,26 @@ function getPlayerCount() {
 }
 
 function addCardToPlayer(player, card) {
-  const playerCardsRange = SpreadsheetApp.getActiveSheet().getRange(
-    PLAYER1_ROW + player,
-    3,
-    1,
-    24,
-  );
+  const playerCardsRange = SpreadsheetApp.getActiveSheet()
+    .getRange(PLAYER1_A1)
+    .offset(player, 1 + PLAYER_NAME_LENGTH, 1, 24);
 
   var currentCards = playerCardsRange.getValues()[0];
   currentCards = currentCards.filter((card) => card !== "");
   currentCards.push(card);
-  currentCards.sort((a, b) => a - b);
+  currentCards
+    .sort((a, b) => a - b)
+    .reduce(
+      (currentCell, currentCard) =>
+        renderPlayerCard(currentCell, currentCard).offset(0, 1),
+      playerCardsRange.offset(0, 0, 1, 1),
+    );
 
-  playerCardsRange
-    .clearContent()
-    .offset(0, 0, 1, currentCards.length)
-    .setValues([currentCards])
-    .setBorder(true, true, true, true, true, true);
-}
-
-function resetPlayerCards() {
-  SpreadsheetApp.getActiveSheet()
-    .getRange(PLAYER1_ROW, 3, MAX_PLAYER_COUNT, 24)
-    .clear();
+  //  playerCardsRange
+  //  .clearContent()
+  // .offset(0, 0, 1, currentCards.length)
+  // .setValues([currentCards])
+  // .setBorder(true, true, true, true, true, true);
 }
 
 function getPlayerTokens() {
@@ -387,7 +389,7 @@ function resetHotspot(location) {
 function renderDeck(cardRange) {
   const noTextStyle = SpreadsheetApp.newTextStyle()
     .setBold(true)
-    .setFontFamily("Francois One")
+    .setFontFamily(FONT_FAMILY)
     .setFontSize(65)
     .setForegroundColor("red")
     .build();
@@ -418,29 +420,69 @@ function renderDeck(cardRange) {
     .setRichTextValue(noThanksRichTextValue);
 }
 
+function renderCurrentCard(cardRange, cardVal) {
+  return renderCard(
+    cardRange
+      .setBackground(cardBorderColor(cardVal))
+      .setBorder(
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        "white",
+        SpreadsheetApp.BorderStyle.SOLID_THICK,
+      )
+      .offset(1, 1, CARD_SIZE - 2, CARD_SIZE - 2)
+      .merge(),
+    cardVal,
+  ).setFontSize(96);
+}
+
+function renderPlayerCard(cardRange, cardVal) {
+  return renderCard(
+    cardRange.setBorder(
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      cardBorderColor(cardVal),
+      SpreadsheetApp.BorderStyle.SOLID_THICK,
+    ),
+    cardVal,
+  ).setFontSize(11);
+}
+
 function renderCard(cardRange, cardVal) {
   return cardRange
-    .setBackground(cardBorderColor(cardVal))
-    .setBorder(
-      true,
-      true,
-      true,
-      true,
-      false,
-      false,
-      "white",
-      SpreadsheetApp.BorderStyle.SOLID_THICK,
-    )
-    .offset(1, 1, CARD_SIZE - 2, CARD_SIZE - 2)
-    .merge()
     .setBackground("white")
     .setFontColor(cardNumberColor(cardVal))
-    .setFontFamily("Impact")
-    .setFontSize(96)
+    .setFontFamily(FONT_FAMILY)
     .setFontWeight("bold")
     .setHorizontalAlignment("center")
     .setVerticalAlignment("middle")
     .setValue(cardVal);
+}
+
+function resetPlayerCards() {
+  SpreadsheetApp.getActiveSheet()
+    .getRange(PLAYER1_A1)
+    .offset(0, PLAYER_NAME_LENGTH, MAX_PLAYER_COUNT, 24)
+    .setBackground(BG_COLOR)
+    .setBorder(
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      "black",
+      SpreadsheetApp.BorderStyle.SOLID_THICK,
+    )
+    .clearContent();
 }
 
 function cardNumberColor(cardVal) {
