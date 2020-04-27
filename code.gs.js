@@ -21,6 +21,8 @@ const CELL_DIMENSION = { WIDTH: 21, HEIGHT: 30 };
 const LOCATION_A1 = { DECK: "B2", CARD: "N2", TOKENS: "C13" };
 const PLAYER_NAME_LENGTH = 5;
 const FONT_FAMILY = "Francois One";
+const TABLE_SHEET_NAME = "Table";
+const TABLE_DIMENSIONS = { HEIGHT: 17, WIDTH: 56 };
 
 // Our calculation of hotspot width seems to miss by a bit so we can just expand
 // it a little by a constant factor to try and fix it.
@@ -30,6 +32,8 @@ const HOTSPOT_WIDTH_CORRECTION_FACTOR = 1.05;
  * Mechanism consts
  */
 const MUTEX_LOCKOUT_PERIOD_MS = 5000;
+const TRANSPARENT_PIXEL_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAsSAAALEgHS3X78AAAADUlEQVQImWP4//8/AwAI/AL+hc2rNAAAAABJRU5ErkJggg==";
 
 ////// API HOOKS ///////////////////////////////////////////////////////////////
 
@@ -39,11 +43,80 @@ function onOpen() {
 
   SpreadsheetApp.getUi()
     .createMenu("No Thanks")
-    .addItem("New Game", "newGame")
+    .addItem("New Table", "newTable")
     .addToUi();
 }
 
 ////// USER ACTIONS ////////////////////////////////////////////////////////////
+
+function newTable() {
+  const file = SpreadsheetApp.getActive();
+
+  const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
+  if (previousSheet != null) {
+    file.deleteSheet(previousSheet);
+  }
+
+  const sheet = file.insertSheet(TABLE_SHEET_NAME);
+
+  const maxRows = sheet.getMaxRows();
+  if (maxRows < TABLE_DIMENSIONS.HEIGHT) {
+    sheet.insertRows(1, TABLE_DIMENSIONS.HEIGHT - maxRows);
+  } else if (maxRows > TABLE_DIMENSIONS.HEIGHT) {
+    sheet.deleteRows(
+      TABLE_DIMENSIONS.HEIGHT + 1,
+      maxRows - TABLE_DIMENSIONS.HEIGHT,
+    );
+  }
+  for (let i = 1; i <= TABLE_DIMENSIONS.HEIGHT; i++) {
+    file.setRowHeight(i, CELL_DIMENSION.HEIGHT);
+  }
+
+  const maxColumns = sheet.getMaxColumns();
+  if (maxColumns < TABLE_DIMENSIONS.WIDTH) {
+    sheet.insertColumns(1, TABLE_DIMENSIONS.WIDTH - maxColumns);
+  } else if (maxColumns > TABLE_DIMENSIONS.WIDTH) {
+    sheet.deleteColumns(
+      TABLE_DIMENSIONS.WIDTH + 1,
+      maxColumns - TABLE_DIMENSIONS.WIDTH,
+    );
+  }
+  for (let i = 1; i <= TABLE_DIMENSIONS.WIDTH; i++) {
+    file.setColumnWidth(i, CELL_DIMENSION.WIDTH);
+  }
+
+  sheet
+    .getRange(1, 1, TABLE_DIMENSIONS.HEIGHT, TABLE_DIMENSIONS.WIDTH)
+    .setBackground(BG_COLOR);
+
+  sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1);
+  sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1);
+  sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1);
+
+  const numPlayers = parseInt(
+    Browser.inputBox(
+      "How many players?",
+      "Enter the number of players at this table (3-7)",
+      Browser.Buttons.OK,
+    ),
+    10,
+  );
+
+  if (numPlayers < 3 || numPlayers > 7) {
+    throw new Error("We only support between 3 to 7 players");
+  }
+
+  sheet
+    .getRange(PLAYER1_A1)
+    .offset(0, 0, numPlayers, PLAYER_NAME_LENGTH)
+    .mergeAcross()
+    .offset(0, 0, numPlayers, 1)
+    .setValues(range(1, numPlayers).map((player) => [`<Player ${player}>`]));
+
+  newGame();
+
+  file.setActiveSheet(sheet);
+}
 
 function revealTopCard() {
   singleEntry(() => {
@@ -170,7 +243,7 @@ function drawCard(deck) {
 
 function newDeck() {
   // Create a new deck (which is just a range of numbers
-  var deck = range(MAX_CARD, MIN_CARD);
+  var deck = range(MIN_CARD, MAX_CARD);
 
   // Remove cards from the deck
   for (var i = 0; i < SETUP_CARDS_REMOVED; i++) {
@@ -257,7 +330,7 @@ function getCurrentCard() {
     .offset(1, 1)
     .getA1Notation();
   const cardStr = getCellValue(currentCardA1);
-  return cardStr != null ? parseInt(cardStr) : null;
+  return cardStr != null ? parseInt(cardStr, 10) : null;
 }
 
 function setCurrentCard(cardVal) {
@@ -599,7 +672,7 @@ function singleEntry(func) {
   const timestamp = new Date().getTime();
 
   if (timeoutStr !== "") {
-    if (parseInt(timeoutStr) > timestamp) {
+    if (parseInt(timeoutStr, 10) > timestamp) {
       throw new Error("Lock active, previous operation hasn't completed yet");
     } else {
       Browser.msgBox(
@@ -649,10 +722,14 @@ function getHotspotImage(location) {
 
 ////// GENERIC JS HELPERS //////////////////////////////////////////////////////
 
-function range(max, min = 0) {
+function range(a, b) {
+  const min = b == null ? 0 : a;
+  const max = b == null ? a : b;
   return [...Array(max + 1).keys()].splice(min);
 }
 
-function randInt(max, min = 0) {
+function randInt(a, b) {
+  const min = b == null ? 0 : a;
+  const max = b == null ? a : b;
   return min + Math.floor(Math.random() * (max - min + 1));
 }
