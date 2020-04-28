@@ -170,7 +170,11 @@ function takeCard() {
 }
 
 function revealTokens() {
-  renderPlayerTokens();
+  singleEntry(() => {
+    renderPlayerTokens();
+    resetHotspot("TOKENS");
+    setInstructionsMessage("");
+  });
 }
 
 function noThanks() {
