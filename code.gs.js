@@ -54,53 +54,59 @@ function onOpen() {
   // Remove any previous locks
   resetSheetMetadataObject("lock");
 
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu("No Thanks")
-    .addSubMenu(
-      ui
-        .createMenu("New Table")
-        .addItem("Same Players", "newTableSamePlayers")
-        .addItem("New Players", "newTableNewPlayers"),
-    )
+  SpreadsheetApp.getUi()
+    .createMenu("No Thanks")
+    .addItem("New Table", "newTable")
     .addToUi();
 }
 
 ////// USER ACTIONS ////////////////////////////////////////////////////////////
 
-function newTableNewPlayers() {
+function newTable(players) {
   singleEntry(() => {
-    const players = [];
-    for (let i = 1; i <= MAX_PLAYER_COUNT; i++) {
-      const name = Browser.inputBox(
-        "Add Player" + (i <= 3 ? "" : "?"),
-        "Enter name" +
-          (i <= 3 ? "" : " (or leave blank to finish entering names)"),
-        Browser.Buttons.OK,
-      );
-      if (name == null || name === "") {
-        break;
+    const file = SpreadsheetApp.getActive();
+    const newSheet = file.insertSheet("Creating new table...");
+
+    try {
+      file.setActiveSheet(newSheet);
+
+      renderTable(file, newSheet);
+
+      let players = getPlayersFromPreviousTable();
+      if (
+        players != null &&
+        players.length >= 3 &&
+        Browser.msgBox("Same Players?", Browser.Buttons.YES_NO) === "no"
+      ) {
+        players = getNewPlayersFromUser();
       }
-      players.push(name);
+
+      // We also shuffle the players to randomize seating each time
+      renderPlayerArea(newSheet, shuffle(players));
+      renderTokensBox(newSheet);
+
+      // Insert hotspot images for the hotspot locations
+      range(Object.keys(LOCATION_A1).length - 1).forEach((_) =>
+        newSheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1),
+      );
+
+      newGame(players.length);
+
+      // Enable the hotspot for the first action
+      enableHotspot("DECK", "revealTopCard");
+      // ... and update the tokens pool with instructions
+      setInstructionsMessage(MSG_REVEAL);
+
+      // Replace the previous table once we are done setting everything up
+      const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
+      if (previousSheet != null) {
+        file.deleteSheet(previousSheet);
+      }
+      newSheet.setName(TABLE_SHEET_NAME);
+    } catch (err) {
+      file.deleteSheet(newSheet);
+      throw err;
     }
-
-    if (players.length < 3 || players.length > 7) {
-      throw new Error("We only support between 3 to 7 players");
-    }
-
-    newTable(players);
-  });
-}
-
-function newTableSamePlayers() {
-  singleEntry(() => {
-    const previousNames = SpreadsheetApp.getActive()
-      .getSheetByName(TABLE_SHEET_NAME)
-      .getRange(PLAYER1_A1)
-      .offset(0, 0, MAX_PLAYER_COUNT, 1)
-      .getValues()
-      .map((row) => row[0])
-      .filter((name) => name != "");
-    newTable(previousNames);
   });
 }
 
@@ -195,43 +201,6 @@ function noThanks() {
 }
 
 ////// LOGICAL ACTIONS /////////////////////////////////////////////////////////
-
-function newTable(players) {
-  const file = SpreadsheetApp.getActive();
-  const newSheet = file.insertSheet("Creating new table...");
-
-  try {
-    file.setActiveSheet(newSheet);
-
-    renderTable(file, newSheet);
-
-    // We also shuffle the players to randomize seating each time
-    renderPlayerArea(newSheet, shuffle(players));
-    renderTokensBox(newSheet);
-
-    // Insert hotspot images for the hotspot locations
-    range(Object.keys(LOCATION_A1).length - 1).forEach((_) =>
-      newSheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1),
-    );
-
-    newGame(players.length);
-
-    // Enable the hotspot for the first action
-    enableHotspot("DECK", "revealTopCard");
-    // ... and update the tokens pool with instructions
-    setInstructionsMessage(MSG_REVEAL);
-
-    // Replace the previous table once we are done setting everything up
-    const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
-    if (previousSheet != null) {
-      file.deleteSheet(previousSheet);
-    }
-    newSheet.setName(TABLE_SHEET_NAME);
-  } catch (err) {
-    file.deleteSheet(newSheet);
-    throw err;
-  }
-}
 
 function newGame(numPlayers) {
   // Randomize a new deck
@@ -500,6 +469,22 @@ function resetHotspot(location) {
     .assignScript("");
 }
 
+function getPlayersFromPreviousTable() {
+  const previousSheet = SpreadsheetApp.getActive().getSheetByName(
+    TABLE_SHEET_NAME,
+  );
+  if (previousSheet == null) {
+    return null;
+  }
+
+  return previousSheet
+    .getRange(PLAYER1_A1)
+    .offset(0, 0, MAX_PLAYER_COUNT, 1)
+    .getValues()
+    .map((row) => row[0])
+    .filter((name) => name != "");
+}
+
 ////// RENDER //////////////////////////////////////////////////////////////////
 
 function renderDeck(cardRange) {
@@ -689,6 +674,28 @@ function renderTokensBox(sheet) {
       SpreadsheetApp.BorderStyle.SOLID_THICK,
     )
     .setWrap(true);
+}
+
+function getNewPlayersFromUser() {
+  const players = [];
+  for (let i = 1; i <= MAX_PLAYER_COUNT; i++) {
+    const name = Browser.inputBox(
+      "Add Player" + (i <= 3 ? "" : "?"),
+      "Enter name" +
+        (i <= 3 ? "" : " (or leave blank to finish entering names)"),
+      Browser.Buttons.OK,
+    );
+    if (name == null || name === "") {
+      break;
+    }
+    players.push(name);
+  }
+
+  if (players.length < 3 || players.length > 7) {
+    throw new Error("We only support between 3 to 7 players");
+  }
+
+  return players;
 }
 
 function cardNumberColor(cardVal) {
