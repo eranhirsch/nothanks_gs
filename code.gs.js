@@ -19,10 +19,15 @@ const DECK_BACK_COLOR = "#1c4587";
 const PLAYER1_A1 = "Z6";
 const CELL_DIMENSION = { WIDTH: 21, HEIGHT: 30 };
 const LOCATION_A1 = { DECK: "B2", CARD: "N2", TOKENS: "C13" };
-const PLAYER_NAME_LENGTH = 5;
+const PLAYER_NAME_LENGTH = 4;
 const FONT_FAMILY = "Francois One";
 const TABLE_SHEET_NAME = "Table";
 const TABLE_DIMENSIONS = { HEIGHT: 17, WIDTH: 56 };
+
+const MSG_REVEAL = "Click DECK to reveal next card";
+const MSG_TURN = `Click the CARD to take it and add it to your table
+OR
+Click HERE to pay 1${TOKEN_REPR} to skip your turn`;
 
 // Our calculation of hotspot width seems to miss by a bit so we can just expand
 // it a little by a constant factor to try and fix it.
@@ -50,72 +55,54 @@ function onOpen() {
 ////// USER ACTIONS ////////////////////////////////////////////////////////////
 
 function newTable() {
-  const file = SpreadsheetApp.getActive();
+  singleEntry(() => {
+    const file = SpreadsheetApp.getActive();
+    const newSheet = file.insertSheet("Creating new table...");
 
-  const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
-  if (previousSheet != null) {
-    file.deleteSheet(previousSheet);
-  }
+    try {
+      file.setActiveSheet(newSheet);
 
-  const sheet = file.insertSheet(TABLE_SHEET_NAME);
+      renderTable(file, newSheet);
 
-  const maxRows = sheet.getMaxRows();
-  if (maxRows < TABLE_DIMENSIONS.HEIGHT) {
-    sheet.insertRows(1, TABLE_DIMENSIONS.HEIGHT - maxRows);
-  } else if (maxRows > TABLE_DIMENSIONS.HEIGHT) {
-    sheet.deleteRows(
-      TABLE_DIMENSIONS.HEIGHT + 1,
-      maxRows - TABLE_DIMENSIONS.HEIGHT,
-    );
-  }
-  for (let i = 1; i <= TABLE_DIMENSIONS.HEIGHT; i++) {
-    file.setRowHeight(i, CELL_DIMENSION.HEIGHT);
-  }
+      const numPlayers = parseInt(
+        Browser.inputBox(
+          "How many players?",
+          "Enter the number of players at this table (3-7)",
+          Browser.Buttons.OK,
+        ),
+        10,
+      );
 
-  const maxColumns = sheet.getMaxColumns();
-  if (maxColumns < TABLE_DIMENSIONS.WIDTH) {
-    sheet.insertColumns(1, TABLE_DIMENSIONS.WIDTH - maxColumns);
-  } else if (maxColumns > TABLE_DIMENSIONS.WIDTH) {
-    sheet.deleteColumns(
-      TABLE_DIMENSIONS.WIDTH + 1,
-      maxColumns - TABLE_DIMENSIONS.WIDTH,
-    );
-  }
-  for (let i = 1; i <= TABLE_DIMENSIONS.WIDTH; i++) {
-    file.setColumnWidth(i, CELL_DIMENSION.WIDTH);
-  }
+      if (numPlayers < 3 || numPlayers > 7) {
+        throw new Error("We only support between 3 to 7 players");
+      }
 
-  sheet
-    .getRange(1, 1, TABLE_DIMENSIONS.HEIGHT, TABLE_DIMENSIONS.WIDTH)
-    .setBackground(BG_COLOR);
+      renderPlayerArea(newSheet, numPlayers);
+      renderTokensBox(newSheet);
 
-  sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1);
-  sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1);
-  sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1);
+      // Insert hotspot images for the hotspot locations
+      range(Object.keys(LOCATION_A1).length - 1).forEach((_) =>
+        newSheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1),
+      );
 
-  const numPlayers = parseInt(
-    Browser.inputBox(
-      "How many players?",
-      "Enter the number of players at this table (3-7)",
-      Browser.Buttons.OK,
-    ),
-    10,
-  );
+      newGame(numPlayers);
 
-  if (numPlayers < 3 || numPlayers > 7) {
-    throw new Error("We only support between 3 to 7 players");
-  }
+      // Enable the hotspot for the first action
+      enableHotspot("DECK", "revealTopCard");
+      // ... and update the tokens pool with instructions
+      setCurrentTokens(null);
 
-  sheet
-    .getRange(PLAYER1_A1)
-    .offset(0, 0, numPlayers, PLAYER_NAME_LENGTH)
-    .mergeAcross()
-    .offset(0, 0, numPlayers, 1)
-    .setValues(range(1, numPlayers).map((player) => [`<Player ${player}>`]));
-
-  newGame();
-
-  file.setActiveSheet(sheet);
+      // Replace the previous table once we are done setting everything up
+      const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
+      if (previousSheet != null) {
+        file.deleteSheet(previousSheet);
+      }
+      newSheet.setName(TABLE_SHEET_NAME);
+    } catch (err) {
+      file.deleteSheet(newSheet);
+      throw err;
+    }
+  });
 }
 
 function revealTopCard() {
@@ -166,13 +153,8 @@ function takeCard() {
 
     if (tokens > 0) {
       Browser.msgBox(
-        "Take Tokens",
-        getPlayerName(player) +
-          ": Add " +
-          tokens +
-          " token" +
-          (tokens === 1 ? "" : "s") +
-          " to your pool",
+        getPlayerName(player),
+        `Add ${tokens}${TOKEN_REPR} to your personal pool`,
         Browser.Buttons.OK,
       );
       addTokensToPlayer(player, tokens);
@@ -202,31 +184,18 @@ function noThanks() {
   });
 }
 
-function newGame() {
-  singleEntry(() => {
-    // Reset all hotspots
-    Object.keys(LOCATION_A1).forEach((location) => resetHotspot(location));
-    setDeck(null);
-    setPlayerTokens(null);
-    setCurrentCard(null);
-    setCurrentTokens(null);
-    resetPlayerCards();
-
-    const playerCount = getPlayerCount();
-
-    // Pick a random starting player
-    setActivePlayer(randInt(playerCount - 1));
-
-    // deal tokens to each player
-    dealTokens(playerCount);
-
-    // Recreate the starting deck
-    enableHotspot("DECK", "revealTopCard");
-    setDeck(newDeck());
-  });
-}
-
 ////// LOGICAL ACTIONS /////////////////////////////////////////////////////////
+
+function newGame(numPlayers) {
+  // Randomize a new deck
+  setDeck(newDeck());
+
+  // deal tokens to each player
+  dealTokens(numPlayers);
+
+  // Pick a random starting player
+  setActivePlayer(randInt(numPlayers - 1));
+}
 
 function drawCard(deck) {
   const randIndex = randInt(deck.length - 1);
@@ -243,10 +212,10 @@ function drawCard(deck) {
 
 function newDeck() {
   // Create a new deck (which is just a range of numbers
-  var deck = range(MIN_CARD, MAX_CARD);
+  let deck = range(MIN_CARD, MAX_CARD);
 
   // Remove cards from the deck
-  for (var i = 0; i < SETUP_CARDS_REMOVED; i++) {
+  for (let i = 0; i < SETUP_CARDS_REMOVED; i++) {
     deck = drawCard(deck).remainingDeck;
   }
 
@@ -274,7 +243,7 @@ function addTokensToPlayer(player, tokens) {
 }
 
 function dealTokens(playerCount) {
-  var tokens;
+  let tokens;
   if (playerCount <= 5) {
     tokens = 11;
   } else if (playerCount == 6) {
@@ -284,8 +253,8 @@ function dealTokens(playerCount) {
   }
 
   Browser.msgBox(
-    "Take Tokens",
-    "All Players: Add " + tokens + " tokens to your pool",
+    "All Players",
+    `Add ${tokens}${TOKEN_REPR} to your personal pool`,
     Browser.Buttons.OK,
   );
   range(playerCount - 1).forEach((player) => addTokensToPlayer(player, tokens));
@@ -352,12 +321,43 @@ function setCurrentCard(cardVal) {
 
 function getCurrentTokens() {
   const tokenStr = getCellValue(LOCATION_A1.TOKENS);
+
+  if (tokenStr === MSG_REVEAL) {
+    return null;
+  }
+  if (tokenStr === MSG_TURN) {
+    return 0;
+  }
+
   return tokenStr != null ? tokenStr.length / TOKEN_REPR.length : null;
 }
 
 function setCurrentTokens(tokens) {
+  const tokensRange = SpreadsheetApp.getActiveSheet().getRange(
+    LOCATION_A1.TOKENS,
+  );
+
+  if (tokens == null) {
+    tokensRange.setFontSize(14).setValue(MSG_REVEAL);
+    return;
+  }
+
+  if (tokens === 0) {
+    tokensRange.setFontSize(14).setValue(MSG_TURN);
+    return;
+  }
+
+  // We want to fit as many tokens as possible in the box for any token count
+  tokensRange.setFontSize(
+    tokens <= 24
+      ? 39 - 3 * Math.ceil(Math.max(0, tokens - 16) / 2)
+      : tokens <= 39
+      ? 25
+      : 21,
+  );
+
   const tokensStr = TOKEN_REPR.repeat(tokens);
-  setCellValue(LOCATION_A1.TOKENS, tokensStr);
+  tokensRange.setValue(tokensStr);
 }
 
 function getActivePlayer() {
@@ -399,9 +399,9 @@ function getPlayerCount() {
 function addCardToPlayer(player, card) {
   const playerCardsRange = SpreadsheetApp.getActiveSheet()
     .getRange(PLAYER1_A1)
-    .offset(player, 1 + PLAYER_NAME_LENGTH, 1, 24);
+    .offset(player, 2 + PLAYER_NAME_LENGTH, 1, 24);
 
-  var currentCards = playerCardsRange.getValues()[0];
+  let currentCards = playerCardsRange.getValues()[0];
   currentCards = currentCards.filter((card) => card !== "");
   currentCards.push(card);
   currentCards
@@ -411,12 +411,6 @@ function addCardToPlayer(player, card) {
         renderPlayerCard(currentCell, currentCard).offset(0, 1),
       playerCardsRange.offset(0, 0, 1, 1),
     );
-
-  //  playerCardsRange
-  //  .clearContent()
-  // .offset(0, 0, 1, currentCards.length)
-  // .setValues([currentCards])
-  // .setBorder(true, true, true, true, true, true);
 }
 
 function getPlayerTokens() {
@@ -545,14 +539,17 @@ function renderCard(cardRange, cardVal) {
     .setValue(cardVal);
 }
 
-function resetPlayerCards() {
-  SpreadsheetApp.getActiveSheet()
+function renderPlayerArea(sheet, numPlayers) {
+  sheet
     .getRange(PLAYER1_A1)
-    .offset(0, PLAYER_NAME_LENGTH, MAX_PLAYER_COUNT, 25)
-    .setBackground(BG_COLOR)
+    .offset(0, 0, numPlayers, PLAYER_NAME_LENGTH)
+    .mergeAcross()
+    .offset(0, 0, numPlayers, 1)
+    .setValues(range(1, numPlayers).map((player) => [`<Player ${player}>`]))
+    .offset(0, -1, numPlayers, 1 + PLAYER_NAME_LENGTH + 2 + 24)
     .setBorder(
       true,
-      false,
+      true,
       true,
       true,
       false,
@@ -560,7 +557,14 @@ function resetPlayerCards() {
       "black",
       SpreadsheetApp.BorderStyle.SOLID_THICK,
     )
-    .clearContent();
+    .offset(0, 1 + PLAYER_NAME_LENGTH, numPlayers, 2)
+    .merge()
+    .offset(0, 0, 1, 1)
+    .setValue(TOKEN_REPR + ": Hidden")
+    .setVerticalAlignment("middle")
+    .setHorizontalAlignment("center")
+    .setFontWeight("bold")
+    .setTextRotation(-90);
 }
 
 function renderActivePlayerMarker(range) {
@@ -569,6 +573,61 @@ function renderActivePlayerMarker(range) {
     .setVerticalAlignment("middle")
     .setHorizontalAlignment("center")
     .setValue(ACTIVE_PLAYER_MARKER);
+}
+
+function renderTable(file, sheet) {
+  const maxRows = sheet.getMaxRows();
+  if (maxRows < TABLE_DIMENSIONS.HEIGHT) {
+    sheet.insertRows(1, TABLE_DIMENSIONS.HEIGHT - maxRows);
+  } else if (maxRows > TABLE_DIMENSIONS.HEIGHT) {
+    sheet.deleteRows(
+      TABLE_DIMENSIONS.HEIGHT + 1,
+      maxRows - TABLE_DIMENSIONS.HEIGHT,
+    );
+  }
+
+  const maxColumns = sheet.getMaxColumns();
+  if (maxColumns < TABLE_DIMENSIONS.WIDTH) {
+    sheet.insertColumns(1, TABLE_DIMENSIONS.WIDTH - maxColumns);
+  } else if (maxColumns > TABLE_DIMENSIONS.WIDTH) {
+    sheet.deleteColumns(
+      TABLE_DIMENSIONS.WIDTH + 1,
+      maxColumns - TABLE_DIMENSIONS.WIDTH,
+    );
+  }
+
+  for (let i = 1; i <= TABLE_DIMENSIONS.HEIGHT; i++) {
+    file.setRowHeight(i, CELL_DIMENSION.HEIGHT);
+  }
+  for (let i = 1; i <= TABLE_DIMENSIONS.WIDTH; i++) {
+    file.setColumnWidth(i, CELL_DIMENSION.WIDTH);
+  }
+
+  sheet
+    .getRange(1, 1, TABLE_DIMENSIONS.HEIGHT, TABLE_DIMENSIONS.WIDTH)
+    .setVerticalAlignment("middle")
+    .setHorizontalAlignment("center")
+    .setBackground(BG_COLOR);
+}
+
+function renderTokensBox(sheet) {
+  const tokensRange = SpreadsheetApp.getActiveSheet()
+    .getRange(LOCATION_A1.TOKENS)
+    .offset(0, 0, 4, CARD_SIZE * 2);
+
+  tokensRange
+    .merge()
+    .setBorder(
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      "white",
+      SpreadsheetApp.BorderStyle.SOLID_THICK,
+    )
+    .setWrap(true);
 }
 
 function cardNumberColor(cardVal) {
@@ -629,7 +688,7 @@ function cardBorderColor(cardVal) {
 function getSheetMetadataObject(key) {
   const sheet = SpreadsheetApp.getActiveSheet();
 
-  var arr = sheet.createDeveloperMetadataFinder().withKey(key).find();
+  let arr = sheet.createDeveloperMetadataFinder().withKey(key).find();
 
   if (arr.length !== 1) {
     resetSheetMetadataObject(key);
@@ -656,14 +715,6 @@ function resetSheetMetadataObject(key) {
 function getCellValue(a1Notation) {
   const cell = SpreadsheetApp.getActiveSheet().getRange(a1Notation);
   return cell.isBlank() ? null : cell.getValue();
-}
-
-function setCellValue(a1Notation, value) {
-  const cell = SpreadsheetApp.getActiveSheet().getRange(a1Notation);
-  if (value == null) {
-    cell.clearContent();
-  }
-  cell.setValue(value);
 }
 
 function singleEntry(func) {
