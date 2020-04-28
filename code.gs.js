@@ -74,8 +74,8 @@ function newTable(players) {
 
       let players = getPlayersFromPreviousTable();
       if (
-        players != null &&
-        players.length >= 3 &&
+        players == null ||
+        players.length < 3 ||
         Browser.msgBox("Same Players?", Browser.Buttons.YES_NO) === "no"
       ) {
         players = getNewPlayersFromUser();
