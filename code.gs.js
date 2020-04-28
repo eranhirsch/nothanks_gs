@@ -11,23 +11,31 @@ const SETUP_CARDS_REMOVED = 9;
 /**
  * UI consts
  */
-const CARD_SIZE = 10;
 const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
+
 const BG_COLOR = "#fff3dc";
 const DECK_BACK_COLOR = "#1c4587";
+
 const PLAYER1_A1 = "Z6";
-const CELL_DIMENSION = { WIDTH: 21, HEIGHT: 30 };
 const LOCATION_A1 = { DECK: "B2", CARD: "N2", TOKENS: "C13" };
-const PLAYER_NAME_LENGTH = 4;
+
+const CELL_DIMENSION = { WIDTH: 21, HEIGHT: 30 };
+
 const FONT_FAMILY = "Francois One";
+
 const TABLE_SHEET_NAME = "Table";
+
+const CARD_SIZE = 10;
+const PLAYER_NAME_LENGTH = 4;
 const TABLE_DIMENSIONS = { HEIGHT: 17, WIDTH: 56 };
 
 const MSG_REVEAL = "Click DECK to reveal next card";
 const MSG_TURN = `Click the CARD to take it and add it to your table
 OR
 Click HERE to pay 1${TOKEN_REPR} to skip your turn`;
+const MSG_END_GAME = `Game Over!
+Click HERE to reveal everyone's personal ${TOKEN_REPR}`;
 
 // Our calculation of hotspot width seems to miss by a bit so we can just expand
 // it a little by a constant factor to try and fix it.
@@ -46,62 +54,53 @@ function onOpen() {
   // Remove any previous locks
   resetSheetMetadataObject("lock");
 
-  SpreadsheetApp.getUi()
-    .createMenu("No Thanks")
-    .addItem("New Table", "newTable")
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu("No Thanks")
+    .addSubMenu(
+      ui
+        .createMenu("New Table")
+        .addItem("Same Players", "newTableSamePlayers")
+        .addItem("New Players", "newTableNewPlayers"),
+    )
     .addToUi();
 }
 
 ////// USER ACTIONS ////////////////////////////////////////////////////////////
 
-function newTable() {
+function newTableNewPlayers() {
   singleEntry(() => {
-    const file = SpreadsheetApp.getActive();
-    const newSheet = file.insertSheet("Creating new table...");
-
-    try {
-      file.setActiveSheet(newSheet);
-
-      renderTable(file, newSheet);
-
-      const numPlayers = parseInt(
-        Browser.inputBox(
-          "How many players?",
-          "Enter the number of players at this table (3-7)",
-          Browser.Buttons.OK,
-        ),
-        10,
+    const players = [];
+    for (let i = 1; i <= MAX_PLAYER_COUNT; i++) {
+      const name = Browser.inputBox(
+        "Add Player" + (i <= 3 ? "" : "?"),
+        "Enter name" +
+          (i <= 3 ? "" : " (or leave blank to finish entering names)"),
+        Browser.Buttons.OK,
       );
-
-      if (numPlayers < 3 || numPlayers > 7) {
-        throw new Error("We only support between 3 to 7 players");
+      if (name == null || name === "") {
+        break;
       }
-
-      renderPlayerArea(newSheet, numPlayers);
-      renderTokensBox(newSheet);
-
-      // Insert hotspot images for the hotspot locations
-      range(Object.keys(LOCATION_A1).length - 1).forEach((_) =>
-        newSheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1),
-      );
-
-      newGame(numPlayers);
-
-      // Enable the hotspot for the first action
-      enableHotspot("DECK", "revealTopCard");
-      // ... and update the tokens pool with instructions
-      setCurrentTokens(null);
-
-      // Replace the previous table once we are done setting everything up
-      const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
-      if (previousSheet != null) {
-        file.deleteSheet(previousSheet);
-      }
-      newSheet.setName(TABLE_SHEET_NAME);
-    } catch (err) {
-      file.deleteSheet(newSheet);
-      throw err;
+      players.push(name);
     }
+
+    if (players.length < 3 || players.length > 7) {
+      throw new Error("We only support between 3 to 7 players");
+    }
+
+    newTable(players);
+  });
+}
+
+function newTableSamePlayers() {
+  singleEntry(() => {
+    const previousNames = SpreadsheetApp.getActive()
+      .getSheetByName(TABLE_SHEET_NAME)
+      .getRange(PLAYER1_A1)
+      .offset(0, 0, MAX_PLAYER_COUNT, 1)
+      .getValues()
+      .map((row) => row[0])
+      .filter((name) => name != "");
+    newTable(previousNames);
   });
 }
 
@@ -130,7 +129,7 @@ function revealTopCard() {
     setDeck(remainingDeck);
 
     enableHotspot("TOKENS", "noThanks");
-    setCurrentTokens(0);
+    setInstructionsMessage(MSG_TURN);
   });
 }
 
@@ -146,7 +145,6 @@ function takeCard() {
     resetHotspot("CARD");
     setCurrentCard(null);
     resetHotspot("TOKENS");
-    setCurrentTokens(null);
 
     player = getActivePlayer();
     addCardToPlayer(player, card);
@@ -162,9 +160,17 @@ function takeCard() {
 
     const deck = getDeck();
     if (deck != null && deck.length > 0) {
+      setInstructionsMessage(MSG_REVEAL);
       enableHotspot("DECK", "revealTopCard");
+    } else {
+      setInstructionsMessage(MSG_END_GAME);
+      enableHotspot("TOKENS", "revealTokens");
     }
   });
+}
+
+function revealTokens() {
+  renderPlayerTokens();
 }
 
 function noThanks() {
@@ -185,6 +191,43 @@ function noThanks() {
 }
 
 ////// LOGICAL ACTIONS /////////////////////////////////////////////////////////
+
+function newTable(players) {
+  const file = SpreadsheetApp.getActive();
+  const newSheet = file.insertSheet("Creating new table...");
+
+  try {
+    file.setActiveSheet(newSheet);
+
+    renderTable(file, newSheet);
+
+    // We also shuffle the players to randomize seating each time
+    renderPlayerArea(newSheet, shuffle(players));
+    renderTokensBox(newSheet);
+
+    // Insert hotspot images for the hotspot locations
+    range(Object.keys(LOCATION_A1).length - 1).forEach((_) =>
+      newSheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1),
+    );
+
+    newGame(players.length);
+
+    // Enable the hotspot for the first action
+    enableHotspot("DECK", "revealTopCard");
+    // ... and update the tokens pool with instructions
+    setInstructionsMessage(MSG_REVEAL);
+
+    // Replace the previous table once we are done setting everything up
+    const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
+    if (previousSheet != null) {
+      file.deleteSheet(previousSheet);
+    }
+    newSheet.setName(TABLE_SHEET_NAME);
+  } catch (err) {
+    file.deleteSheet(newSheet);
+    throw err;
+  }
+}
 
 function newGame(numPlayers) {
   // Randomize a new deck
@@ -322,42 +365,38 @@ function setCurrentCard(cardVal) {
 function getCurrentTokens() {
   const tokenStr = getCellValue(LOCATION_A1.TOKENS);
 
-  if (tokenStr === MSG_REVEAL) {
-    return null;
-  }
-  if (tokenStr === MSG_TURN) {
-    return 0;
+  if (
+    tokenStr != null &&
+    tokenStr.match(new RegExp(`^${TOKEN_REPR}+$`, "gu"))
+  ) {
+    return tokenStr.length / TOKEN_REPR.length;
   }
 
-  return tokenStr != null ? tokenStr.length / TOKEN_REPR.length : null;
+  // We use the current token pool for messaging too, but in those cases the actual
+  // tokens are always null (and could be coalesced to 0).
+  return null;
 }
 
 function setCurrentTokens(tokens) {
-  const tokensRange = SpreadsheetApp.getActiveSheet().getRange(
-    LOCATION_A1.TOKENS,
-  );
+  SpreadsheetApp.getActiveSheet()
+    .getRange(LOCATION_A1.TOKENS)
+    // We want to fit as many tokens as possible in the box for any token count
+    .setFontSize(
+      tokens <= 24
+        ? 39 - 3 * Math.ceil(Math.max(0, tokens - 16) / 2)
+        : tokens <= 39
+        ? 25
+        : 21,
+    )
+    // If the value is a number we create a string made up of the token icons
+    .setValue(TOKEN_REPR.repeat(tokens));
+}
 
-  if (tokens == null) {
-    tokensRange.setFontSize(14).setValue(MSG_REVEAL);
-    return;
-  }
-
-  if (tokens === 0) {
-    tokensRange.setFontSize(14).setValue(MSG_TURN);
-    return;
-  }
-
-  // We want to fit as many tokens as possible in the box for any token count
-  tokensRange.setFontSize(
-    tokens <= 24
-      ? 39 - 3 * Math.ceil(Math.max(0, tokens - 16) / 2)
-      : tokens <= 39
-      ? 25
-      : 21,
-  );
-
-  const tokensStr = TOKEN_REPR.repeat(tokens);
-  tokensRange.setValue(tokensStr);
+function setInstructionsMessage(message) {
+  SpreadsheetApp.getActiveSheet()
+    .getRange(LOCATION_A1.TOKENS)
+    .setFontSize(12)
+    .setValue(message);
 }
 
 function getActivePlayer() {
@@ -432,7 +471,9 @@ function enableHotspot(location, script, title = "", description = "") {
   if (location === "TOKENS") {
     image
       .setHeight(CELL_DIMENSION.HEIGHT * 4)
-      .setWidth(CELL_DIMENSION.WIDTH * 20 * HOTSPOT_WIDTH_CORRECTION_FACTOR);
+      .setWidth(
+        CELL_DIMENSION.WIDTH * CARD_SIZE * 2 * HOTSPOT_WIDTH_CORRECTION_FACTOR,
+      );
   } else {
     image
       .setHeight(CELL_DIMENSION.HEIGHT * CARD_SIZE)
@@ -539,14 +580,14 @@ function renderCard(cardRange, cardVal) {
     .setValue(cardVal);
 }
 
-function renderPlayerArea(sheet, numPlayers) {
+function renderPlayerArea(sheet, players) {
   sheet
     .getRange(PLAYER1_A1)
-    .offset(0, 0, numPlayers, PLAYER_NAME_LENGTH)
+    .offset(0, 0, players.length, PLAYER_NAME_LENGTH)
     .mergeAcross()
-    .offset(0, 0, numPlayers, 1)
-    .setValues(range(1, numPlayers).map((player) => [`<Player ${player}>`]))
-    .offset(0, -1, numPlayers, 1 + PLAYER_NAME_LENGTH + 2 + 24)
+    .offset(0, 0, players.length, 1)
+    .setValues(players.map((player) => [player]))
+    .offset(0, -1, players.length, 1 + PLAYER_NAME_LENGTH + 2 + 24)
     .setBorder(
       true,
       true,
@@ -557,7 +598,7 @@ function renderPlayerArea(sheet, numPlayers) {
       "black",
       SpreadsheetApp.BorderStyle.SOLID_THICK,
     )
-    .offset(0, 1 + PLAYER_NAME_LENGTH, numPlayers, 2)
+    .offset(0, 1 + PLAYER_NAME_LENGTH, players.length, 2)
     .merge()
     .offset(0, 0, 1, 1)
     .setValue(TOKEN_REPR + ": Hidden")
@@ -565,6 +606,22 @@ function renderPlayerArea(sheet, numPlayers) {
     .setHorizontalAlignment("center")
     .setFontWeight("bold")
     .setTextRotation(-90);
+}
+
+function renderPlayerTokens() {
+  const playerCount = getPlayerCount();
+  SpreadsheetApp.getActiveSheet()
+    .getRange(PLAYER1_A1)
+    .offset(0, PLAYER_NAME_LENGTH, playerCount, 2)
+    .breakApart()
+    .mergeAcross()
+    .offset(0, 0, playerCount, 1)
+    .setTextRotation(0)
+    .setValues(
+      Object.values(getPlayerTokens()).map((tokens) => [
+        `${tokens}${TOKEN_REPR}`,
+      ]),
+    );
 }
 
 function renderActivePlayerMarker(range) {
@@ -783,4 +840,15 @@ function randInt(a, b) {
   const min = b == null ? 0 : a;
   const max = b == null ? a : b;
   return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function shuffle(array) {
+  for (let i = array.length; i > 0; i--) {
+    const randomIndex = randInt(i - 1);
+    const temporaryValue = array[i - 1];
+    array[i - 1] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
 }
