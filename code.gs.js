@@ -75,7 +75,9 @@ function newTable(players) {
         players == null ||
         ui.alert(
           "Same Players?",
-          "Do you want to use the same list of players as the previous round?",
+          `Do you want to use the same list of players as the previous round (${players.join(
+            ", ",
+          )})?`,
           ui.ButtonSet.YES_NO,
         ) === ui.Button.NO
       ) {
@@ -684,7 +686,7 @@ function getNewPlayersFromUser() {
   const players = [];
   for (let i = 1; i <= MAX_PLAYER_COUNT; i++) {
     const response = ui.prompt(
-      `Player ${i}${i <= 3 ? "" : "?"}`,
+      `${i <= 3 ? "" : "Add "}Player ${i}${i <= 3 ? "" : "?"}`,
       "Name:",
       i <= 3 ? ui.ButtonSet.OK : ui.ButtonSet.YES_NO,
     );
