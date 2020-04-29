@@ -67,7 +67,21 @@ function newTable(players) {
     try {
       file.setActiveSheet(newSheet);
 
-      const players = getPlayersForNewTable();
+      let players = getPlayersForNewTable();
+
+      const ui = SpreadsheetApp.getUi();
+      if (
+        ui.alert(
+          "Randomize player order?",
+          `Click "Yes" to randomize the play order
+                   
+                   Or "No" to use the current one:
+                   ${players.join(", ")}`,
+          ui.ButtonSet.YES_NO,
+        ) === ui.Button.YES
+      ) {
+        players = shuffle(players);
+      }
 
       renderNewTable(file, newSheet, players);
 
@@ -515,8 +529,7 @@ function getPlayersFromPreviousTable() {
 function renderNewTable(file, sheet, players) {
   renderTable(file, sheet);
 
-  // We also shuffle the players to randomize seating each time
-  renderPlayerArea(sheet, shuffle(players));
+  renderPlayerArea(sheet, players);
   renderTokensBox(sheet);
 
   // Insert hotspot images for the hotspot locations
