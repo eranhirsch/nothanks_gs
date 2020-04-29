@@ -9,7 +9,7 @@ const MAX_CARD = 35;
 const SETUP_CARDS_REMOVED = 9;
 
 /**
- * UI constsa
+ * UI consts
  */
 const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
