@@ -67,38 +67,11 @@ function newTable(players) {
     try {
       file.setActiveSheet(newSheet);
 
-      renderTable(file, newSheet);
+      const players = getPlayersForNewTable();
 
-      const ui = SpreadsheetApp.getUi();
-      let players = getPlayersFromPreviousTable();
-      if (
-        players == null ||
-        ui.alert(
-          "Same Players?",
-          `Do you want to use the same list of players as the previous round (${players.join(
-            ", ",
-          )})?`,
-          ui.ButtonSet.YES_NO,
-        ) === ui.Button.NO
-      ) {
-        players = getNewPlayersFromUser();
-      }
-
-      // We also shuffle the players to randomize seating each time
-      renderPlayerArea(newSheet, shuffle(players));
-      renderTokensBox(newSheet);
-
-      // Insert hotspot images for the hotspot locations
-      range(Object.keys(LOCATION_A1).length - 1).forEach((_) =>
-        newSheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1),
-      );
+      renderNewTable(file, newSheet, players);
 
       newGame(players.length);
-
-      // Enable the hotspot for the first action
-      enableHotspot("DECK", "revealTopCard");
-      // ... and update the tokens pool with instructions
-      setInstructionsMessage(MSG_REVEAL);
 
       // Replace the previous table once we are done setting everything up
       const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
@@ -170,8 +143,7 @@ function takeCard() {
 
     const deck = getDeck();
     if (deck != null && deck.length > 0) {
-      setInstructionsMessage(MSG_REVEAL);
-      enableHotspot("DECK", "revealTopCard");
+      enableDeck();
     } else {
       setInstructionsMessage(MSG_END_GAME);
       enableHotspot("TOKENS", "revealTokens");
@@ -205,6 +177,23 @@ function noThanks() {
 
 ////// LOGICAL ACTIONS /////////////////////////////////////////////////////////
 
+function getPlayersForNewTable() {
+  const ui = SpreadsheetApp.getUi();
+  let players = getPlayersFromPreviousTable();
+  if (
+    players == null ||
+    ui.alert(
+      "Same Players?",
+      `Do you want to use the same list of players as the previous round (${players.join(
+        ", ",
+      )})?`,
+      ui.ButtonSet.YES_NO,
+    ) === ui.Button.NO
+  ) {
+    players = getNewPlayersFromUser();
+  }
+}
+
 function newGame(numPlayers) {
   // Randomize a new deck
   setDeck(newDeck());
@@ -214,6 +203,13 @@ function newGame(numPlayers) {
 
   // Pick a random starting player
   setActivePlayer(randInt(numPlayers - 1));
+
+  enableDeck();
+}
+
+function enableDeck() {
+  setInstructionsMessage(MSG_REVEAL);
+  enableHotspot("DECK", "revealTopCard");
 }
 
 function drawCard(deck) {
@@ -490,6 +486,19 @@ function getPlayersFromPreviousTable() {
 }
 
 ////// RENDER //////////////////////////////////////////////////////////////////
+
+function renderNewTable(file, sheet, players) {
+  renderTable(file, sheet);
+
+  // We also shuffle the players to randomize seating each time
+  renderPlayerArea(sheet, shuffle(players));
+  renderTokensBox(sheet);
+
+  // Insert hotspot images for the hotspot locations
+  range(Object.keys(LOCATION_A1).length - 1).forEach((_) =>
+    sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1),
+  );
+}
 
 function renderDeck(cardRange) {
   const noTextStyle = SpreadsheetApp.newTextStyle()
