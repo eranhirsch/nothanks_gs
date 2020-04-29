@@ -71,7 +71,7 @@ function newTable(players) {
 
       renderNewTable(file, newSheet, players);
 
-      newGame(players.length);
+      newGame(players);
 
       // Replace the previous table once we are done setting everything up
       const previousSheet = file.getSheetByName(TABLE_SHEET_NAME);
@@ -179,37 +179,62 @@ function noThanks() {
 
 function getPlayersForNewTable() {
   const ui = SpreadsheetApp.getUi();
-  let players = getPlayersFromPreviousTable();
+  const players = getPlayersFromPreviousTable();
   if (
-    players == null ||
+    players != null &&
     ui.alert(
       "Same Players?",
       `Do you want to use the same list of players as the previous round (${players.join(
         ", ",
       )})?`,
       ui.ButtonSet.YES_NO,
-    ) === ui.Button.NO
+    ) === ui.Button.YES
   ) {
-    players = getNewPlayersFromUser();
+    return players;
   }
+
+  return getNewPlayersFromUser();
 }
 
-function newGame(numPlayers) {
+function newGame(players) {
   // Randomize a new deck
   setDeck(newDeck());
 
   // deal tokens to each player
-  dealTokens(numPlayers);
+  dealTokens(players.length);
 
-  // Pick a random starting player
-  setActivePlayer(randInt(numPlayers - 1));
+  setStartingPlayer(players);
 
   enableDeck();
 }
 
+function setStartingPlayer(players) {
+  const ui = SpreadsheetApp.getUi();
+
+  const response = ui.prompt(
+    "Choose starting player?",
+    `Pick who goes first by entering their number:
+    ${players.map((name, i) => i + 1 + " - " + name).join("\n")}
+    
+    Or select "No" for a random pick`,
+    ui.ButtonSet.YES_NO,
+  );
+
+  const startPlayer =
+    response.getSelectedButton() === ui.Button.NO
+      ? randInt(players.length - 1)
+      : parseInt(response.getResponseText(), 10) - 1;
+
+  if (!(startPlayer >= 0 && startPlayer < players.length)) {
+    throw new Error(`Invalid start player value: ${startPlayer}`);
+  }
+
+  setActivePlayer(startPlayer);
+}
+
 function enableDeck() {
-  setInstructionsMessage(MSG_REVEAL);
   enableHotspot("DECK", "revealTopCard");
+  setInstructionsMessage(MSG_REVEAL);
 }
 
 function drawCard(deck) {
