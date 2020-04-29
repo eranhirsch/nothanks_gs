@@ -9,7 +9,7 @@ const MAX_CARD = 35;
 const SETUP_CARDS_REMOVED = 9;
 
 /**
- * UI consts
+ * UI constsa
  */
 const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
@@ -51,9 +51,6 @@ const TRANSPARENT_PIXEL_URL =
 ////// API HOOKS ///////////////////////////////////////////////////////////////
 
 function onOpen() {
-  // Remove any previous locks
-  resetSheetMetadataObject("lock");
-
   SpreadsheetApp.getUi()
     .createMenu("No Thanks")
     .addItem("New Table", "newTable")
