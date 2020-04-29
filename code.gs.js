@@ -9,7 +9,7 @@ const MAX_CARD = 35;
 const SETUP_CARDS_REMOVED = 9;
 
 /**
- * UI consts
+ * UI constsa
  */
 const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
@@ -69,11 +69,15 @@ function newTable(players) {
 
       renderTable(file, newSheet);
 
+      const ui = SpreadsheetApp.getUi();
       let players = getPlayersFromPreviousTable();
       if (
         players == null ||
-        players.length < 3 ||
-        Browser.msgBox("Same Players?", Browser.Buttons.YES_NO) === "no"
+        ui.alert(
+          "Same Players?",
+          "Do you want to use the same list of players as the previous round?",
+          ui.ButtonSet.YES_NO,
+        ) === ui.Button.NO
       ) {
         players = getNewPlayersFromUser();
       }
@@ -153,10 +157,11 @@ function takeCard() {
     addCardToPlayer(player, card);
 
     if (tokens > 0) {
-      Browser.msgBox(
+      const ui = SpreadsheetApp.getUi();
+      ui.alert(
         getPlayerName(player),
         `Add ${tokens}${TOKEN_REPR} to your personal pool`,
-        Browser.Buttons.OK,
+        ui.ButtonSet.OK,
       );
       addTokensToPlayer(player, tokens);
     }
@@ -184,8 +189,7 @@ function noThanks() {
   singleEntry(() => {
     const currentCard = getCurrentCard();
     if (currentCard == null) {
-      Browser.msgBox("No card revealed yet!");
-      return;
+      throw new Error("No card revealed yet!");
     }
 
     // Take token from player
@@ -265,10 +269,11 @@ function dealTokens(playerCount) {
     tokens = 7;
   }
 
-  Browser.msgBox(
+  const ui = SpreadsheetApp.getUi();
+  ui.alert(
     "All Players",
     `Add ${tokens}${TOKEN_REPR} to your personal pool`,
-    Browser.Buttons.OK,
+    ui.ButtonSet.OK,
   );
   range(playerCount - 1).forEach((player) => addTokensToPlayer(player, tokens));
 }
@@ -674,18 +679,21 @@ function renderTokensBox(sheet) {
 }
 
 function getNewPlayersFromUser() {
+  const ui = SpreadsheetApp.getUi();
+
   const players = [];
   for (let i = 1; i <= MAX_PLAYER_COUNT; i++) {
-    const name = Browser.inputBox(
-      "Add Player" + (i <= 3 ? "" : "?"),
-      "Enter name" +
-        (i <= 3 ? "" : " (or leave blank to finish entering names)"),
-      Browser.Buttons.OK,
+    const response = ui.prompt(
+      `Player ${i}${i <= 3 ? "" : "?"}`,
+      "Name:",
+      i <= 3 ? ui.ButtonSet.OK : ui.ButtonSet.YES_NO,
     );
-    if (name == null || name === "") {
+
+    if (response.getSelectedButton() === ui.Button.NO) {
       break;
     }
-    players.push(name);
+
+    players.push(response.getResponseText());
   }
 
   if (players.length < 3 || players.length > 7) {
@@ -791,7 +799,7 @@ function singleEntry(func) {
     if (parseInt(timeoutStr, 10) > timestamp) {
       throw new Error("Lock active, previous operation hasn't completed yet");
     } else {
-      Browser.msgBox(
+      SpreadsheetApp.getActive().toast(
         "Previous lock wasn't cleared but we are out of the lockout period." +
           "Timeout was: " +
           timeoutStr +
