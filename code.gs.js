@@ -793,31 +793,26 @@ function getCellValue(a1Notation) {
 }
 
 function singleEntry(func) {
-  const metadata = getSheetMetadataObject("lock");
-  const timeoutStr = metadata.getValue();
-  const timestamp = new Date().getTime();
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const fullTableRange = sheet.getRange(
+    1,
+    1,
+    sheet.getMaxRows(),
+    sheet.getMaxColumns(),
+  );
 
-  if (timeoutStr !== "") {
-    if (parseInt(timeoutStr, 10) > timestamp) {
-      throw new Error("Lock active, previous operation hasn't completed yet");
-    } else {
-      SpreadsheetApp.getActive().toast(
-        "Previous lock wasn't cleared but we are out of the lockout period." +
-          "Timeout was: " +
-          timeoutStr +
-          ", Timestamp is: " +
-          timestamp,
-      );
-    }
-  }
+  const lock = LockService.getUserLock();
+  lock.waitLock(MUTEX_LOCKOUT_PERIOD_MS);
 
-  metadata.setValue(timestamp + MUTEX_LOCKOUT_PERIOD_MS);
+  // We activate the whole table as a signal that the script is running
+  fullTableRange.activate();
 
   try {
     func();
   } finally {
-    // Release the lock
-    resetSheetMetadataObject("lock");
+    fullTableRange.offset(0, 0, 1, 1).activate();
+
+    lock.releaseLock();
   }
 }
 
