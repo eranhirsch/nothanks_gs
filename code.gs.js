@@ -60,13 +60,12 @@ function onOpen() {
 ////// USER ACTIONS ////////////////////////////////////////////////////////////
 
 function newTable(players) {
+  const file = SpreadsheetApp.getActive();
+  const newSheet = file.insertSheet("Creating new table...");
+  file.setActiveSheet(newSheet);
+
   singleEntry(() => {
-    const file = SpreadsheetApp.getActive();
-    const newSheet = file.insertSheet("Creating new table...");
-
     try {
-      file.setActiveSheet(newSheet);
-
       let players = getPlayersForNewTable();
 
       const ui = SpreadsheetApp.getUi();
