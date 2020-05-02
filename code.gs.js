@@ -268,7 +268,7 @@ function newDeck() {
   let deck = Array.of(...xrange(MIN_CARD, MAX_CARD + 1));
 
   // Remove cards from the deck
-  for (let i = 0; i < SETUP_CARDS_REMOVED; i++) {
+  for (const _ of xrange(SETUP_CARDS_REMOVED)) {
     deck = drawCard(deck).remainingDeck;
   }
 
@@ -701,10 +701,10 @@ function renderTable(file, sheet) {
     );
   }
 
-  for (let i = 1; i <= TABLE_DIMENSIONS.HEIGHT; i++) {
+  for (const i = 1; i <= TABLE_DIMENSIONS.HEIGHT; i++) {
     file.setRowHeight(i, CELL_DIMENSION.HEIGHT);
   }
-  for (let i = 1; i <= TABLE_DIMENSIONS.WIDTH; i++) {
+  for (const i = 1; i <= TABLE_DIMENSIONS.WIDTH; i++) {
     file.setColumnWidth(i, CELL_DIMENSION.WIDTH);
   }
 
@@ -739,7 +739,7 @@ function getNewPlayersFromUser() {
   const ui = SpreadsheetApp.getUi();
 
   const players = [];
-  for (let i = 1; i <= MAX_PLAYER_COUNT; i++) {
+  for (const i of xrange(1, MAX_PLAYER_COUNT + 1)) {
     const response = ui.prompt(
       `${i <= 3 ? "" : "Add "}Player ${i}${i <= 3 ? "" : "?"}`,
       "Name:",
@@ -868,7 +868,7 @@ function* xrange(a, b) {
   const start = b == null ? 0 : a;
   const end = b == null ? a : b;
 
-  for (let i = start; i < end; i++) {
+  for (const i = start; i < end; i++) {
     yield i;
   }
 
@@ -882,7 +882,7 @@ function randInt(a, b) {
 }
 
 function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
+  for (const i = array.length - 1; i > 0; i--) {
     const randomIndex = randInt(i);
     const temporaryValue = array[i];
     array[i] = array[randomIndex];
