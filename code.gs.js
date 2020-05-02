@@ -884,10 +884,10 @@ function randInt(a, b) {
 }
 
 function shuffle(array) {
-  for (let i = array.length; i > 0; i--) {
-    const randomIndex = randInt(i - 1);
-    const temporaryValue = array[i - 1];
-    array[i - 1] = array[randomIndex];
+  for (let i = array.length - 1; i >= 0; i--) {
+    const randomIndex = randInt(i);
+    const temporaryValue = array[i];
+    array[i] = array[randomIndex];
     array[randomIndex] = temporaryValue;
   }
 
