@@ -317,12 +317,12 @@ function dealTokens(playerCount) {
 ////// STATE MANAGEMENT ////////////////////////////////////////////////////////
 
 function getDeck() {
-  const value = getSheetMetadataObject("deck").getValue();
-  if (value == null || value === "") {
+  const { deck } = PropertiesService.getDocumentProperties().getProperties();
+  if (deck == null || deck === "") {
     return null;
   }
 
-  return JSON.parse(value);
+  return JSON.parse(deck);
 }
 
 function setDeck(deck) {
@@ -331,7 +331,7 @@ function setDeck(deck) {
     .offset(0, 0, CARD_SIZE, CARD_SIZE);
 
   if (deck == null || deck.length === 0) {
-    resetSheetMetadataObject("deck");
+    PropertiesService.getDocumentProperties().deleteProperty("deck");
 
     cardRange
       .breakApart()
@@ -342,7 +342,7 @@ function setDeck(deck) {
   }
 
   const serialized = JSON.stringify(deck);
-  getSheetMetadataObject("deck").setValue(serialized);
+  PropertiesService.getDocumentProperties().setProperty("deck", serialized);
 
   renderDeck(cardRange);
 }
@@ -464,17 +464,26 @@ function addCardToPlayer(player, card) {
 }
 
 function getPlayerTokens() {
-  const serialized = getSheetMetadataObject("playerTokens").getValue();
-  return serialized !== "" ? JSON.parse(serialized) : {};
+  const {
+    playerTokens,
+  } = PropertiesService.getDocumentProperties().getProperties();
+  if (playerTokens == null || playerTokens == "") {
+    return {};
+  }
+
+  return JSON.parse(playerTokens);
 }
 
 function setPlayerTokens(playerTokens) {
   if (playerTokens == null) {
-    resetSheetMetadataObject("playerTokens");
+    PropertiesService.getDocumentProperties().deleteProperty("playerTokens");
     return;
   }
   const serialized = JSON.stringify(playerTokens);
-  getSheetMetadataObject("playerTokens").setValue(serialized);
+  PropertiesService.getDocumentProperties().setProperty(
+    "playerTokens",
+    serialized,
+  );
 }
 
 function enableHotspot(location, script, title = "", description = "") {
@@ -805,33 +814,6 @@ function cardBorderColor(cardVal) {
 }
 
 ////// GENERIC SHEET HELPERS ///////////////////////////////////////////////////
-
-function getSheetMetadataObject(key) {
-  const sheet = SpreadsheetApp.getActiveSheet();
-
-  let arr = sheet.createDeveloperMetadataFinder().withKey(key).find();
-
-  if (arr.length !== 1) {
-    resetSheetMetadataObject(key);
-    arr = [];
-  }
-
-  if (arr.length === 0) {
-    sheet.addDeveloperMetadata(key);
-    arr = sheet.createDeveloperMetadataFinder().withKey(key).find();
-  }
-
-  return arr[0];
-}
-
-function resetSheetMetadataObject(key) {
-  SpreadsheetApp.getActive()
-    .getActiveSheet()
-    .createDeveloperMetadataFinder()
-    .withKey(key)
-    .find()
-    .forEach((md) => md.remove());
-}
 
 function getCellValue(a1Notation) {
   const cell = SpreadsheetApp.getActiveSheet().getRange(a1Notation);
