@@ -311,7 +311,7 @@ function dealTokens(playerCount) {
     `Add ${tokens}${TOKEN_REPR} to your personal pool`,
     ui.ButtonSet.OK,
   );
-  playerTokens = {};
+  const playerTokens = {};
   for (const player of xrange(playerCount)) {
     playerTokens[player] = tokens;
   }
