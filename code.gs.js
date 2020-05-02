@@ -387,8 +387,8 @@ function getCurrentTokens() {
     return tokenStr.length / TOKEN_REPR.length;
   }
 
-  // We use the current token pool for messaging too, but in those cases the actual
-  // tokens are always null (and could be coalesced to 0).
+  // We use the current token pool for messaging too, but in those cases the
+  // actual tokens are always null (and could be coalesced to 0).
   return null;
 }
 
@@ -490,34 +490,25 @@ function setPlayerTokens(playerTokens) {
   );
 }
 
-function enableHotspot(location, script, title = "", description = "") {
+function enableHotspot(location, script) {
+  const dimensions =
+    location !== "TOKENS"
+      ? { width: CARD_SIZE, height: CARD_SIZE }
+      : { width: CARD_SIZE * 2, height: 4 };
   const image = getHotspotImage(location);
-  if (location === "TOKENS") {
-    image
-      .setHeight(CELL_DIMENSION.HEIGHT * 4)
-      .setWidth(
-        CELL_DIMENSION.WIDTH * CARD_SIZE * 2 * HOTSPOT_WIDTH_CORRECTION_FACTOR,
-      );
-  } else {
-    image
-      .setHeight(CELL_DIMENSION.HEIGHT * CARD_SIZE)
-      .setWidth(
-        CELL_DIMENSION.WIDTH * CARD_SIZE * HOTSPOT_WIDTH_CORRECTION_FACTOR,
-      );
-  }
   image
-    .setAltTextTitle(title !== "" ? title : script)
-    .setAltTextDescription(description)
+    .setAnchorCell(image.getSheet().getRange(LOCATION_A1[location]))
+    .setAnchorCellXOffset(0)
+    .setAnchorCellYOffset(0)
+    .setHeight(CELL_DIMENSION.HEIGHT * dimensions.height)
+    .setWidth(
+      CELL_DIMENSION.WIDTH * HOTSPOT_WIDTH_CORRECTION_FACTOR * dimensions.width,
+    )
     .assignScript(script);
 }
 
 function resetHotspot(location) {
-  getHotspotImage(location)
-    .setHeight(0)
-    .setWidth(0)
-    .setAltTextTitle("")
-    .setAltTextDescription("")
-    .assignScript("");
+  getHotspotImage(location).setHeight(0).setWidth(0).assignScript("");
 }
 
 function getPlayersFromPreviousTable() {
@@ -543,11 +534,16 @@ function renderNewTable(file, sheet, players) {
 
   renderPlayerArea(sheet, players);
   renderTokensBox(sheet);
+  renderHotspots(sheet);
+}
+
+function renderHotspots(sheet) {
+  sheet.getImages().forEach((image) => image.remove());
 
   // Insert hotspot images for the hotspot locations
-  for (const _ of xrange(Object.keys(LOCATION_A1).length)) {
-    sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1);
-  }
+  Object.keys(LOCATION_A1).forEach((_) =>
+    sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1),
+  );
 }
 
 function renderDeck(cardRange) {
@@ -849,7 +845,7 @@ function singleEntry(func) {
 }
 
 function getHotspotImage(location) {
-  const imageIndex = Object.keys(LOCATION_A1).sort().indexOf(location);
+  let imageIndex = Object.keys(LOCATION_A1).sort().indexOf(location);
   if (imageIndex === -1) {
     throw new Error(`Unknown hotspot location ${location}`);
   }
@@ -863,12 +859,7 @@ function getHotspotImage(location) {
     );
   }
 
-  return images[imageIndex]
-    .setAnchorCell(
-      SpreadsheetApp.getActiveSheet().getRange(LOCATION_A1[location]),
-    )
-    .setAnchorCellXOffset(0)
-    .setAnchorCellYOffset(0);
+  return images[imageIndex];
 }
 
 ////// GENERIC JS HELPERS //////////////////////////////////////////////////////
