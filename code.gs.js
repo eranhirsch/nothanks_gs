@@ -847,17 +847,15 @@ function singleEntry(func) {
 function getHotspotImage(location) {
   const imageIndex = Object.keys(LOCATION_A1).sort().indexOf(location);
   if (imageIndex === -1) {
-    throw new Error("Unknown hotspot location " + location);
+    throw new Error(`Unknown hotspot location ${location}`);
   }
 
   const images = SpreadsheetApp.getActiveSheet().getImages();
   if (images.length !== Object.keys(LOCATION_A1).length) {
     throw new Error(
-      "Expecting exactly " +
-        Object.keys(LOCATION_A1).length +
-        " images on the sheet, found " +
-        images.length +
-        " instead!",
+      `Expecting exactly ${
+        Object.keys(LOCATION_A1).length
+      } images on the sheet, found ${images.length} instead!`,
     );
   }
 
