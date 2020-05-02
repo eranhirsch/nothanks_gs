@@ -265,7 +265,7 @@ function drawCard(deck) {
 
 function newDeck() {
   // Create a new deck (which is just a range of numbers
-  let deck = [...rangex(MIN_CARD, MAX_CARD)];
+  let deck = Array.of(...xrange(MIN_CARD, MAX_CARD + 1));
 
   // Remove cards from the deck
   for (let i = 0; i < SETUP_CARDS_REMOVED; i++) {
@@ -311,9 +311,8 @@ function dealTokens(playerCount) {
     `Add ${tokens}${TOKEN_REPR} to your personal pool`,
     ui.ButtonSet.OK,
   );
-
-  const playerTokens = {};
-  for (const player of rangex(playerCount - 1)) {
+  playerTokens = {};
+  for (const player of xrange(playerCount)) {
     playerTokens[player] = tokens;
   }
   setPlayerTokens(playerTokens);
@@ -491,7 +490,7 @@ function setPlayerTokens(playerTokens) {
   );
 }
 
-function enableHotspot(location, script) {
+function enableHotspot(location, script, title = "", description = "") {
   const image = getHotspotImage(location);
   if (location === "TOKENS") {
     image
@@ -506,32 +505,19 @@ function enableHotspot(location, script) {
         CELL_DIMENSION.WIDTH * CARD_SIZE * HOTSPOT_WIDTH_CORRECTION_FACTOR,
       );
   }
-  image.assignScript(script);
-  Logger.log(
-    `ENABLE ${location}: 
-      ${image.getAltTextTitle()}, 
-      ${image.getHeight()}, 
-      ${image.getWidth()}, 
-      ${image.getAnchorCell().getA1Notation()}, 
-      ${image.getAnchorCellXOffset()}, 
-      ${image.getAnchorCellYOffset()}, 
-      ${image.getScript()}`,
-  );
+  image
+    .setAltTextTitle(title !== "" ? title : script)
+    .setAltTextDescription(description)
+    .assignScript(script);
 }
 
 function resetHotspot(location) {
-  const image = getHotspotImage(location);
-  image.setHeight(0).setWidth(0).assignScript("");
-  Logger.log(
-    `RESET ${location}: 
-      ${image.getAltTextTitle()}, 
-      ${image.getHeight()}, 
-      ${image.getWidth()}, 
-      ${image.getAnchorCell().getA1Notation()}, 
-      ${image.getAnchorCellXOffset()}, 
-      ${image.getAnchorCellYOffset()}, 
-      ${image.getScript()}`,
-  );
+  getHotspotImage(location)
+    .setHeight(0)
+    .setWidth(0)
+    .setAltTextTitle("")
+    .setAltTextDescription("")
+    .assignScript("");
 }
 
 function getPlayersFromPreviousTable() {
@@ -559,19 +545,9 @@ function renderNewTable(file, sheet, players) {
   renderTokensBox(sheet);
 
   // Insert hotspot images for the hotspot locations
-  Object.entries(LOCATION_A1).forEach(([name, a1]) => {
-    const locationRange = sheet.getRange(a1);
-    sheet
-      .insertImage(
-        TRANSPARENT_PIXEL_URL,
-        locationRange.getRow(),
-        locationRange.getColumn(),
-        0,
-        0,
-      )
-      .setAltTextTitle(name);
-    resetHotspot(name);
-  });
+  for (const _ of xrange(Object.keys(LOCATION_A1).length)) {
+    sheet.insertImage(TRANSPARENT_PIXEL_URL, 1, 1);
+  }
 }
 
 function renderDeck(cardRange) {
@@ -873,27 +849,22 @@ function singleEntry(func) {
 }
 
 function getHotspotImage(location) {
-  const image = SpreadsheetApp.getActiveSheet()
-    .getImages()
-    .find((image) => image.getAltTextTitle() === location);
-
-  if (image == null) {
-    throw new Error(`Couldn't find image for location ${location}`);
+  const imageIndex = Object.keys(LOCATION_A1).sort().indexOf(location);
+  if (imageIndex === -1) {
+    throw new Error(`Unknown hotspot location ${location}`);
   }
 
-  Logger.log(
-    `Image ${location}: 
-      ${image.getAltTextTitle()}, 
-      ${image.getHeight()}, 
-      ${image.getWidth()}, 
-      ${image.getAnchorCell().getA1Notation()}, 
-      ${image.getAnchorCellXOffset()}, 
-      ${image.getAnchorCellYOffset()}, 
-      ${image.getScript()}`,
-  );
+  const images = SpreadsheetApp.getActiveSheet().getImages();
+  if (images.length !== Object.keys(LOCATION_A1).length) {
+    throw new Error(
+      `Expecting exactly ${
+        Object.keys(LOCATION_A1).length
+      } images on the sheet, found ${images.length} instead!`,
+    );
+  }
 
-  return image
-  .setAnchorCell(
+  return images[imageIndex]
+    .setAnchorCell(
       SpreadsheetApp.getActiveSheet().getRange(LOCATION_A1[location]),
     )
     .setAnchorCellXOffset(0)
@@ -902,7 +873,7 @@ function getHotspotImage(location) {
 
 ////// GENERIC JS HELPERS //////////////////////////////////////////////////////
 
-function* rangex(a, b) {
+function* xrange(a, b) {
   const start = b == null ? 0 : a;
   const end = b == null ? a : b;
 
