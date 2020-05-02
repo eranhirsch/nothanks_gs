@@ -845,7 +845,7 @@ function singleEntry(func) {
 }
 
 function getHotspotImage(location) {
-  let imageIndex = Object.keys(LOCATION_A1).sort().indexOf(location);
+  const imageIndex = Object.keys(LOCATION_A1).sort().indexOf(location);
   if (imageIndex === -1) {
     throw new Error(`Unknown hotspot location ${location}`);
   }
