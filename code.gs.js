@@ -884,7 +884,7 @@ function randInt(a, b) {
 }
 
 function shuffle(array) {
-  for (let i = array.length - 1; i >= 0; i--) {
+  for (let i = array.length - 1; i > 0; i--) {
     const randomIndex = randInt(i);
     const temporaryValue = array[i];
     array[i] = array[randomIndex];
