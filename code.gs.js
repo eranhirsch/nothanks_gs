@@ -455,16 +455,48 @@ function addCardToPlayer(player, card) {
     .getRange(PLAYER1_A1)
     .offset(player, 2 + PLAYER_NAME_LENGTH, 1, 24);
 
-  let currentCards = playerCardsRange.getValues()[0];
-  currentCards = currentCards.filter((card) => card !== "");
-  currentCards.push(card);
-  currentCards
-    .sort((a, b) => a - b)
-    .reduce(
-      (currentCell, currentCard) =>
-        renderPlayerCard(currentCell, currentCard).offset(0, 1),
-      playerCardsRange.offset(0, 0, 1, 1),
+  let currentCards = playerCardsRange
+    .getValues()[0]
+    .filter((card) => card !== "")
+    .map((card) =>
+      typeof card === "number"
+        ? card
+        : parseInt(card.match(/^'?([1-3]?\d)$/)[1], 10),
     );
+  currentCards.push(card);
+
+  let nextCell = playerCardsRange.offset(0, 0, 1, 1);
+  for (let run of groupConsecutiveRuns(currentCards)) {
+    renderPlayerCardSeries(nextCell, run);
+    nextCell = nextCell.offset(0, run.length, 1, 1);
+  }
+}
+
+function* groupConsecutiveRuns(numbers) {
+  const sorted = numbers.slice().sort((a, b) => a - b);
+
+  let currentRun = [];
+  let totalRuns = 0;
+  for (let num of sorted) {
+    if (
+      currentRun.length > 0 &&
+      // Check if the number matches at the end of the current run
+      currentRun[currentRun.length - 1] !== num - 1
+    ) {
+      totalRuns++;
+      yield currentRun;
+      currentRun = [];
+    }
+
+    currentRun.push(num);
+  }
+
+  if (currentRun.length > 0) {
+    totalRuns++;
+    yield currentRun;
+  }
+
+  return totalRuns;
 }
 
 function getPlayerTokens() {
@@ -598,24 +630,32 @@ function renderCurrentCard(cardRange, cardVal) {
       .merge(),
     cardVal,
   )
+    .setValue(cardVal)
     .setFontSize(96)
     .setFontWeight("bold");
 }
 
-function renderPlayerCard(cardRange, cardVal) {
-  return renderCard(
-    cardRange.setBorder(
-      true,
-      true,
-      true,
-      true,
-      false,
-      false,
-      cardBorderColor(cardVal),
-      SpreadsheetApp.BorderStyle.SOLID_THICK,
-    ),
-    cardVal,
+function renderPlayerCardSeries(cardRangeStart, cardSeries) {
+  let outputValues = cardSeries.slice();
+  const firstInSeries = outputValues.shift();
+  const seriesRange = renderCard(
+    cardRangeStart
+      .offset(0, 0, 1, cardSeries.length)
+      .setBorder(
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        cardBorderColor(firstInSeries),
+        SpreadsheetApp.BorderStyle.SOLID_THICK,
+      ),
+    firstInSeries,
   ).setFontSize(12);
+  outputValues = outputValues.map((value) => `'${value}`);
+  outputValues.unshift(`${firstInSeries}`);
+  seriesRange.setValues([outputValues]);
 }
 
 function renderCard(cardRange, cardVal) {
@@ -624,8 +664,7 @@ function renderCard(cardRange, cardVal) {
     .setFontColor(cardNumberColor(cardVal))
     .setFontFamily(FONT_FAMILY)
     .setHorizontalAlignment("center")
-    .setVerticalAlignment("middle")
-    .setValue(cardVal);
+    .setVerticalAlignment("middle");
 }
 
 function renderPlayerArea(sheet, players) {
