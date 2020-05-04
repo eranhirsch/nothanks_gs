@@ -197,9 +197,8 @@ function getPlayersForNewTable() {
     players != null &&
     ui.alert(
       "Same Players?",
-      `Do you want to use the same list of players as the previous round (${players.join(
-        ", ",
-      )})?`,
+      `Do you want to use the same list of players as the previous round?
+(${players.join(", ")})`,
       ui.ButtonSet.YES_NO,
     ) === ui.Button.YES
   ) {
@@ -459,6 +458,8 @@ function addCardToPlayer(player, card) {
     .getValues()[0]
     .filter((card) => card !== "")
     .map((card) =>
+      // We need to remove the single-quote from cells in runs so we can get
+      // their actual numerical value
       typeof card === "number"
         ? card
         : parseInt(card.match(/^'?([1-3]?\d)$/)[1], 10),
@@ -467,8 +468,12 @@ function addCardToPlayer(player, card) {
 
   let nextCell = playerCardsRange.offset(0, 0, 1, 1);
   for (let run of groupConsecutiveRuns(currentCards)) {
-    renderPlayerCardSeries(nextCell, run);
-    nextCell = nextCell.offset(0, run.length, 1, 1);
+    const firstCard = run.shift();
+    // We add a single-quote to the rest of the cards in the run so that they
+    // aren't counted as numbers when summing over the whole range.
+    run = run.map((card) => `'${card}`);
+    renderPlayerCardRun(nextCell, firstCard, run);
+    nextCell = nextCell.offset(0, 1 + run.length, 1, 1);
   }
 }
 
@@ -613,58 +618,50 @@ function renderDeck(cardRange) {
 }
 
 function renderCurrentCard(cardRange, cardVal) {
-  return renderCard(
-    cardRange
-      .setBackground(cardBorderColor(cardVal))
-      .setBorder(
-        true,
-        true,
-        true,
-        true,
-        false,
-        false,
-        "white",
-        SpreadsheetApp.BorderStyle.SOLID_THICK,
-      )
-      .offset(1, 1, CARD_SIZE - 2, CARD_SIZE - 2)
-      .merge(),
-    cardVal,
-  )
-    .setValue(cardVal)
-    .setFontSize(96)
-    .setFontWeight("bold");
-}
-
-function renderPlayerCardSeries(cardRangeStart, cardSeries) {
-  let outputValues = cardSeries.slice();
-  const firstInSeries = outputValues.shift();
-  const seriesRange = renderCard(
-    cardRangeStart
-      .offset(0, 0, 1, cardSeries.length)
-      .setBorder(
-        true,
-        true,
-        true,
-        true,
-        false,
-        false,
-        cardBorderColor(firstInSeries),
-        SpreadsheetApp.BorderStyle.SOLID_THICK,
-      ),
-    firstInSeries,
-  ).setFontSize(12);
-  outputValues = outputValues.map((value) => `'${value}`);
-  outputValues.unshift(`${firstInSeries}`);
-  seriesRange.setValues([outputValues]);
-}
-
-function renderCard(cardRange, cardVal) {
-  return cardRange
+  cardRange
+    .setBackground(cardBorderColor(cardVal))
+    .setBorder(
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      "white",
+      SpreadsheetApp.BorderStyle.SOLID_THICK,
+    )
+    .offset(1, 1, CARD_SIZE - 2, CARD_SIZE - 2)
+    .merge()
     .setBackground("white")
     .setFontColor(cardNumberColor(cardVal))
     .setFontFamily(FONT_FAMILY)
     .setHorizontalAlignment("center")
-    .setVerticalAlignment("middle");
+    .setVerticalAlignment("middle")
+    .setFontSize(96)
+    .setFontWeight("bold")
+    .setValue(cardVal);
+}
+
+function renderPlayerCardRun(firstCell, firstCard, restOfRun) {
+  const runRange = firstCell.offset(0, 0, 1, restOfRun.length + 1);
+  runRange
+    .setBorder(
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      cardBorderColor(firstCard),
+      SpreadsheetApp.BorderStyle.SOLID_THICK,
+    )
+    .setBackground("white")
+    .setFontColor(cardNumberColor(firstCard))
+    .setFontFamily(FONT_FAMILY)
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle")
+    .setFontSize(12);
+  runRange.setValues([[firstCard].concat(restOfRun)]);
 }
 
 function renderPlayerArea(sheet, players) {
