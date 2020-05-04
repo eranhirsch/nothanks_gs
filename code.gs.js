@@ -687,7 +687,9 @@ function renderPlayerArea(sheet, players) {
     .offset(0, 1 + PLAYER_NAME_LENGTH, players.length, 2)
     .mergeAcross()
     .offset(0, 0, players.length, 1)
-    .setNumberFormat('# 🌑;-# 🌑;"None";"??" 🌑')
+    .setNumberFormat(
+      `# ${TOKEN_REPR};-# ${TOKEN_REPR};"None";"??" ${TOKEN_REPR}`,
+    )
     .setVerticalAlignment("middle")
     .setHorizontalAlignment("center")
     .setFontWeight("bold");
