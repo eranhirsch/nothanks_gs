@@ -35,7 +35,7 @@ const MSG_TURN = `Click the CARD to take it and add it to your table
 OR
 Click HERE to pay 1${TOKEN_REPR} to skip your turn`;
 const MSG_END_GAME = `Game Over!
-Click HERE to reveal everyone's personal ${TOKEN_REPR}`;
+Click HERE to reveal the final score`;
 
 // Our calculation of hotspot width seems to miss by a bit so we can just expand
 // it a little by a constant factor to try and fix it.
@@ -159,16 +159,17 @@ function takeCard() {
       enableDeck();
     } else {
       setInstructionsMessage(MSG_END_GAME);
-      enableHotspot("TOKENS", "revealTokens");
+      enableHotspot("TOKENS", "revealFinalScore");
     }
   });
 }
 
-function revealTokens() {
+function revealFinalScore() {
   singleEntry(() => {
-    renderPlayerTokens(getPlayerTokens());
     resetHotspot("TOKENS");
     setInstructionsMessage("");
+    renderPlayerTokens(getPlayerTokens());
+    renderFinalScore();
   });
 }
 
@@ -705,6 +706,27 @@ function renderPlayerTokens(playerTokens, isHidden = false) {
         isHidden ? "HIDDEN" : playerTokens[player],
       ]),
     );
+}
+
+function renderFinalScore() {
+  const numPlayers = getPlayerCount();
+  const cardsRange = SpreadsheetApp.getActiveSheet()
+    .getRange(PLAYER1_A1)
+    .offset(0, PLAYER_NAME_LENGTH + 2, numPlayers, 24);
+  const maxCards = Math.max(
+    ...cardsRange.getValues().map((row) => row.indexOf("")),
+  );
+
+  const scoreRange = cardsRange
+    .offset(0, maxCards, numPlayers, 24 - maxCards)
+    .mergeAcross()
+    .offset(0, 0, numPlayers, 1)
+    .setFormulaR1C1(
+      `=SUM(R[0]C[${-maxCards}]:R[0]C[-1])-IF(ISNUMBER(R[0]C[${
+        -maxCards - 2
+      }]), R[0]C[${-maxCards - 2}], 0)`,
+    )
+    .setNumberFormat("#");
 }
 
 function renderActivePlayerMarker(range) {
