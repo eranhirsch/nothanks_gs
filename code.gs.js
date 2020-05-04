@@ -166,7 +166,7 @@ function takeCard() {
 
 function revealTokens() {
   singleEntry(() => {
-    renderPlayerTokens();
+    renderPlayerTokens(getPlayerTokens());
     resetHotspot("TOKENS");
     setInstructionsMessage("");
   });
@@ -525,6 +525,8 @@ function setPlayerTokens(playerTokens) {
     "playerTokens",
     serialized,
   );
+
+  renderPlayerTokens(playerTokens, true /* isHidden */);
 }
 
 function enableHotspot(location, script) {
@@ -683,27 +685,22 @@ function renderPlayerArea(sheet, players) {
       SpreadsheetApp.BorderStyle.SOLID_THICK,
     )
     .offset(0, 1 + PLAYER_NAME_LENGTH, players.length, 2)
-    .merge()
-    .offset(0, 0, 1, 1)
-    .setValue(TOKEN_REPR + ": Hidden")
+    .mergeAcross()
+    .offset(0, 0, players.length, 1)
+    .setNumberFormat('# 🌑;-# 🌑;"None";"??" 🌑')
     .setVerticalAlignment("middle")
     .setHorizontalAlignment("center")
-    .setFontWeight("bold")
-    .setTextRotation(-90);
+    .setFontWeight("bold");
 }
 
-function renderPlayerTokens() {
-  const playerCount = getPlayerCount();
+function renderPlayerTokens(playerTokens, isHidden = false) {
+  const numPlayers = Object.keys(playerTokens).length;
   SpreadsheetApp.getActiveSheet()
     .getRange(PLAYER1_A1)
-    .offset(0, PLAYER_NAME_LENGTH, playerCount, 2)
-    .breakApart()
-    .mergeAcross()
-    .offset(0, 0, playerCount, 1)
-    .setTextRotation(0)
+    .offset(0, PLAYER_NAME_LENGTH, numPlayers, 1)
     .setValues(
-      Object.values(getPlayerTokens()).map((tokens) => [
-        `${tokens}${TOKEN_REPR}`,
+      [...xrange(numPlayers)].map((player) => [
+        isHidden ? "HIDDEN" : playerTokens[player],
       ]),
     );
 }
