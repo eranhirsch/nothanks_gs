@@ -1,6 +1,48 @@
 /** @OnlyCurrentDoc */
 
 /**
+ * Game option modifiers (TODO: create settings page)
+ */
+const OPTIONS = {
+  SETUP: {
+    /**
+     * Remove the X0 cards from the game, out of the initial cards removed?
+     * Options: true/false
+     * Default: false
+     */
+    REMOVE_TENS: true,
+
+    /**
+     * Should the player order be shuffled when creating a new table?
+     * Options: yes/no/ask
+     * Default: yes
+     */
+    SHUFFLE_PLAYERS: "yes",
+
+    /**
+     * Pick a specific start player?
+     * Options: true/false
+     * Default: false
+     */
+    PICK_START_PLAYER: false,
+  },
+
+  /**
+   * After taking a card, should the next card be auto-revealed?
+   * Options: true/false
+   * Default: false
+   */
+  AUTO_REVEAL_NEXT_CARD: true,
+
+  /**
+   * Play with hidden tokens (regular) or exposed?
+   * Options: true/false
+   * Default: true
+   */
+  HIDDEN_TOKENS: false,
+};
+
+/**
  * Game's rules consts
  */
 const MAX_PLAYER_COUNT = 7;
@@ -13,6 +55,7 @@ const SETUP_CARDS_REMOVED = 9;
  */
 const TOKEN_REPR = "🌑";
 const ACTIVE_PLAYER_MARKER = "➡️";
+const RANK_MARKERS = ["🏆", "🥈", "🥉", "", "", "", ""];
 
 const BG_COLOR = "#fff3dc";
 const DECK_BACK_COLOR = "#1c4587";
@@ -70,14 +113,16 @@ function newTable(players) {
 
       const ui = SpreadsheetApp.getUi();
       if (
-        ui.alert(
-          "Randomize player order?",
-          `Click "Yes" to randomize the play order
+        OPTIONS.SETUP.SHUFFLE_PLAYERS === "yes" ||
+        (OPTIONS.SETUP.SHUFFLE_PLAYERS === "ask" &&
+          ui.alert(
+            "Randomize player order?",
+            `Click "Yes" to randomize the play order
                    
                    Or "No" to use the current one:
                    ${players.join(", ")}`,
-          ui.ButtonSet.YES_NO,
-        ) === ui.Button.YES
+            ui.ButtonSet.YES_NO,
+          ) === ui.Button.YES)
       ) {
         players = shuffle(players);
       }
@@ -101,30 +146,7 @@ function newTable(players) {
 
 function revealTopCard() {
   singleEntry(() => {
-    const currentCard = getCurrentCard();
-    if (currentCard != null) {
-      throw new Error(
-        "The card '" +
-          currentCard +
-          "' is still out, someone needs to take it first!",
-      );
-    }
-
-    const deck = getDeck();
-    if (deck == null || deck.length === 0) {
-      throw new Error("No more cards in the deck!");
-    }
-
-    const { remainingDeck, card } = drawCard(deck);
-
-    enableHotspot("CARD", "takeCard");
-    setCurrentCard(card);
-
-    resetHotspot("DECK");
-    setDeck(remainingDeck);
-
-    enableHotspot("TOKENS", "noThanks");
-    setInstructionsMessage(MSG_TURN);
+    revealTopCardImpl();
   });
 }
 
@@ -145,12 +167,6 @@ function takeCard() {
     addCardToPlayer(player, card);
 
     if (tokens > 0) {
-      const ui = SpreadsheetApp.getUi();
-      ui.alert(
-        getPlayerName(player),
-        `Add ${tokens}${TOKEN_REPR} to your personal pool`,
-        ui.ButtonSet.OK,
-      );
       addTokensToPlayer(player, tokens);
     }
 
@@ -191,6 +207,33 @@ function noThanks() {
 
 ////// LOGICAL ACTIONS /////////////////////////////////////////////////////////
 
+function revealTopCardImpl() {
+  const currentCard = getCurrentCard();
+  if (currentCard != null) {
+    throw new Error(
+      "The card '" +
+        currentCard +
+        "' is still out, someone needs to take it first!",
+    );
+  }
+
+  const deck = getDeck();
+  if (deck == null || deck.length === 0) {
+    throw new Error("No more cards in the deck!");
+  }
+
+  const { remainingDeck, card } = drawCard(deck);
+
+  enableHotspot("CARD", "takeCard");
+  setCurrentCard(card);
+
+  resetHotspot("DECK");
+  setDeck(remainingDeck);
+
+  enableHotspot("TOKENS", "noThanks");
+  setInstructionsMessage(MSG_TURN);
+}
+
 function getPlayersForNewTable() {
   const ui = SpreadsheetApp.getUi();
   const players = getPlayersFromPreviousTable();
@@ -198,7 +241,7 @@ function getPlayersForNewTable() {
     players != null &&
     ui.alert(
       "Same Players?",
-      `Do you want to use the same list of players as the previous round?
+      `Do you want to use the same list of players as in the previous round?
 (${players.join(", ")})`,
       ui.ButtonSet.YES_NO,
     ) === ui.Button.YES
@@ -216,38 +259,44 @@ function newGame(players) {
   // deal tokens to each player
   dealTokens(players.length);
 
-  setStartingPlayer(players);
+  setActivePlayer(setStartingPlayer(players));
 
   enableDeck();
 }
 
 function setStartingPlayer(players) {
-  const ui = SpreadsheetApp.getUi();
-
-  const response = ui.prompt(
-    "Choose starting player?",
-    `Pick who goes first by entering their number:
+  if (OPTIONS.SETUP.PICK_START_PLAYER) {
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.prompt(
+      "Choose starting player?",
+      `Pick who goes first by entering their number:
     ${players.map((name, i) => i + 1 + " - " + name).join("\n")}
     
     Or select "No" for a random pick`,
-    ui.ButtonSet.YES_NO,
-  );
+      ui.ButtonSet.YES_NO,
+    );
 
-  const startPlayer =
-    response.getSelectedButton() === ui.Button.NO
-      ? randInt(players.length - 1)
-      : parseInt(response.getResponseText(), 10) - 1;
+    if (response.getSelectedButton() === ui.Button.YES) {
+      const startPlayer = parseInt(response.getResponseText(), 10) - 1;
 
-  if (!(startPlayer >= 0 && startPlayer < players.length)) {
-    throw new Error(`Invalid start player value: ${startPlayer}`);
+      if (!(startPlayer >= 0 && startPlayer < players.length)) {
+        throw new Error(`Invalid start player value: ${startPlayer}`);
+      }
+
+      return startPlayer;
+    }
   }
 
-  setActivePlayer(startPlayer);
+  return randInt(players.length - 1);
 }
 
 function enableDeck() {
-  enableHotspot("DECK", "revealTopCard");
-  setInstructionsMessage(MSG_REVEAL);
+  if (OPTIONS.AUTO_REVEAL_NEXT_CARD) {
+    revealTopCardImpl();
+  } else {
+    enableHotspot("DECK", "revealTopCard");
+    setInstructionsMessage(MSG_REVEAL);
+  }
 }
 
 function drawCard(deck) {
@@ -267,8 +316,14 @@ function newDeck() {
   // Create a new deck (which is just a range of numbers
   let deck = Array.of(...xrange(MIN_CARD, MAX_CARD + 1));
 
+  let cardsRemoved = 0;
+  if (OPTIONS.SETUP.REMOVE_TENS) {
+    deck = deck.filter((card) => card % 10 !== 0);
+    cardsRemoved = MAX_CARD - MIN_CARD + 1 - deck.length;
+  }
+
   // Remove cards from the deck
-  for (const _ of xrange(SETUP_CARDS_REMOVED)) {
+  for (; cardsRemoved < SETUP_CARDS_REMOVED; cardsRemoved++) {
     deck = drawCard(deck).remainingDeck;
   }
 
@@ -292,6 +347,20 @@ function addTokensToPlayer(player, tokens) {
   }
   playerTokens[player] = newPlayerTokensCount;
 
+  if (
+    OPTIONS.HIDDEN_TOKENS &&
+    // For the simple case where the player just adds a token to the pool we
+    // don't need to show the message
+    tokens !== -1
+  ) {
+    const ui = SpreadsheetApp.getUi();
+    ui.alert(
+      getPlayerName(player),
+      `Add ${tokens}${TOKEN_REPR} to your personal pool`,
+      ui.ButtonSet.OK,
+    );
+  }
+
   setPlayerTokens(playerTokens);
 }
 
@@ -305,12 +374,15 @@ function dealTokens(playerCount) {
     tokens = 7;
   }
 
-  const ui = SpreadsheetApp.getUi();
-  ui.alert(
-    "All Players",
-    `Add ${tokens}${TOKEN_REPR} to your personal pool`,
-    ui.ButtonSet.OK,
-  );
+  if (OPTIONS.HIDDEN_TOKENS) {
+    const ui = SpreadsheetApp.getUi();
+    ui.alert(
+      "All Players",
+      `Add ${tokens}${TOKEN_REPR} to your personal pool`,
+      ui.ButtonSet.OK,
+    );
+  }
+
   const playerTokens = {};
   for (const player of xrange(playerCount)) {
     playerTokens[player] = tokens;
@@ -479,7 +551,7 @@ function addCardToPlayer(player, card) {
 }
 
 function* groupConsecutiveRuns(numbers) {
-  const sorted = numbers.slice().sort((a, b) => a - b);
+  const sorted = numbers.slice().sort(intComparator);
 
   let currentRun = [];
   let totalRuns = 0;
@@ -527,7 +599,7 @@ function setPlayerTokens(playerTokens) {
     serialized,
   );
 
-  renderPlayerTokens(playerTokens, true /* isHidden */);
+  renderPlayerTokens(playerTokens, OPTIONS.HIDDEN_TOKENS);
 }
 
 function enableHotspot(location, script) {
@@ -710,14 +782,18 @@ function renderPlayerTokens(playerTokens, isHidden = false) {
 
 function renderFinalScore() {
   const numPlayers = getPlayerCount();
-  const cardsRange = SpreadsheetApp.getActiveSheet()
-    .getRange(PLAYER1_A1)
-    .offset(0, PLAYER_NAME_LENGTH + 2, numPlayers, 24);
+  const player1Cell = SpreadsheetApp.getActiveSheet().getRange(PLAYER1_A1);
+  const cardsRange = player1Cell.offset(
+    0,
+    PLAYER_NAME_LENGTH + 2,
+    numPlayers,
+    24,
+  );
   const maxCards = Math.max(
     ...cardsRange.getValues().map((row) => row.indexOf("")),
   );
 
-  const scoreRange = cardsRange
+  const scores = cardsRange
     .offset(0, maxCards, numPlayers, 24 - maxCards)
     .mergeAcross()
     .offset(0, 0, numPlayers, 1)
@@ -726,7 +802,17 @@ function renderFinalScore() {
         -maxCards - 2
       }]), R[0]C[${-maxCards - 2}], 0)`,
     )
-    .setNumberFormat("#");
+    .setFontSize(16)
+    .setFontWeight("bold")
+    .setNumberFormat("0")
+    .getValues();
+
+  const scoresRanked = scores.slice().sort(intComparator);
+  const activePlayerRange = player1Cell
+    .offset(0, -1, numPlayers, 1)
+    .setValues(
+      scores.map((score) => [RANK_MARKERS[scoresRanked.indexOf(score)]]),
+    );
 }
 
 function renderActivePlayerMarker(range) {
@@ -947,4 +1033,8 @@ function shuffle(array) {
   }
 
   return array;
+}
+
+function intComparator(a, b) {
+  return a - b;
 }
