@@ -1,7 +1,5 @@
-// "nothanks_gs", by Eran Hirsch, 2020
-// Protected under the GPL3
-// For more details, and the latest version go to https://github.com/eranhirsch/nothanks_gs
-// Version 1.0
+// "nothanks_gs", v1.0, by Eran Hirsch, 2020 (Protected under the GPL3)
+// Visit the project at: https://github.com/eranhirsch/nothanks_gs
 
 /** @OnlyCurrentDoc */
 
