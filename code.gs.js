@@ -13,7 +13,7 @@ const OPTIONS = {
      * Options: true/false
      * Default: false
      */
-    REMOVE_TENS: true,
+    REMOVE_TENS: false,
 
     /**
      * Should the player order be shuffled when creating a new table?
@@ -35,7 +35,7 @@ const OPTIONS = {
    * Options: true/false
    * Default: false
    */
-  AUTO_REVEAL_NEXT_CARD: true,
+  AUTO_REVEAL_NEXT_CARD: false,
 
   /**
    * Play with hidden tokens (regular) or exposed?
@@ -160,8 +160,6 @@ function takeCard() {
       throw new Error("No card revealed yet to take");
     }
 
-    const tokens = getCurrentTokens();
-
     resetHotspot("CARD");
     setCurrentCard(null);
     resetHotspot("TOKENS");
@@ -169,9 +167,7 @@ function takeCard() {
     player = getActivePlayer();
     addCardToPlayer(player, card);
 
-    if (tokens > 0) {
-      addTokensToPlayer(player, tokens);
-    }
+    takeTokensFromPool(player);
 
     const deck = getDeck();
     if (deck != null && deck.length > 0) {
@@ -187,7 +183,7 @@ function revealFinalScore() {
   singleEntry(() => {
     resetHotspot("TOKENS");
     setInstructionsMessage("");
-    renderPlayerTokens(getPlayerTokens());
+    renderPlayerTokens(getTokens().players);
     renderFinalScore();
   });
 }
@@ -199,11 +195,8 @@ function noThanks() {
       throw new Error("No card revealed yet!");
     }
 
-    // Take token from player
-    addTokensToPlayer(getActivePlayer(), -1);
+    addTokenToPool(getActivePlayer());
 
-    // And add it to the pool
-    setCurrentTokens(getCurrentTokens() + 1);
     advanceActivePlayer();
   });
 }
@@ -340,22 +333,11 @@ function advanceActivePlayer() {
   setActivePlayer(nextPlayer);
 }
 
-function addTokensToPlayer(player, tokens) {
-  const playerTokens = getPlayerTokens();
+function takeTokensFromPool(player) {
+  const tokens = getTokens();
 
-  const playersTokens = player in playerTokens ? playerTokens[player] : 0;
-  const newPlayerTokensCount = playersTokens + tokens;
-  if (newPlayerTokensCount < 0) {
-    throw new Error(getPlayerName(player) + " doesn't have any tokens left!");
-  }
-  playerTokens[player] = newPlayerTokensCount;
-
-  if (
-    OPTIONS.HIDDEN_TOKENS &&
-    // For the simple case where the player just adds a token to the pool we
-    // don't need to show the message
-    tokens !== -1
-  ) {
+  tokens.players[player] += tokens.pool;
+  if (OPTIONS.HIDDEN_TOKENS && tokens.pool > 0) {
     const ui = SpreadsheetApp.getUi();
     ui.alert(
       getPlayerName(player),
@@ -363,19 +345,27 @@ function addTokensToPlayer(player, tokens) {
       ui.ButtonSet.OK,
     );
   }
+  tokens.pool = 0;
 
-  setPlayerTokens(playerTokens);
+  setTokens(tokens);
+}
+
+function addTokenToPool(player) {
+  const tokens = getTokens();
+
+  if (tokens.players[player] === 0) {
+    throw new Error(`${getPlayerName(player)} doesn't have any tokens left!`);
+  }
+  tokens.players[player]--;
+  tokens.pool++;
+
+  setTokens(tokens);
 }
 
 function dealTokens(playerCount) {
-  let tokens;
-  if (playerCount <= 5) {
-    tokens = 11;
-  } else if (playerCount == 6) {
-    tokens = 9;
-  } else if (playerCount == 7) {
-    tokens = 7;
-  }
+  setTokens(null);
+
+  const tokens = tokensPerPlayer(playerCount);
 
   if (OPTIONS.HIDDEN_TOKENS) {
     const ui = SpreadsheetApp.getUi();
@@ -386,11 +376,30 @@ function dealTokens(playerCount) {
     );
   }
 
-  const playerTokens = {};
-  for (const player of xrange(playerCount)) {
-    playerTokens[player] = tokens;
+  setTokens({
+    players: Array(playerCount).fill(tokens),
+    version: 0,
+    pool: null,
+  });
+}
+
+function tokensPerPlayer(playerCount) {
+  switch (playerCount) {
+    case 3:
+    case 4:
+    case 5:
+      return 11;
+    case 6:
+      return 9;
+    case 7:
+      return 7;
+    default:
+      throw new Error(`Unsupported player count ${playerCount}`);
   }
-  setPlayerTokens(playerTokens);
+}
+
+function totalTokensInGame(playerCount) {
+  return playerCount * tokensPerPlayer(playerCount);
 }
 
 ////// STATE MANAGEMENT ////////////////////////////////////////////////////////
@@ -450,36 +459,6 @@ function setCurrentCard(cardVal) {
   }
 
   renderCurrentCard(cardRange, cardVal);
-}
-
-function getCurrentTokens() {
-  const tokenStr = getCellValue(LOCATION_A1.TOKENS);
-
-  if (
-    tokenStr != null &&
-    tokenStr.match(new RegExp(`^${TOKEN_REPR}+$`, "gu"))
-  ) {
-    return tokenStr.length / TOKEN_REPR.length;
-  }
-
-  // We use the current token pool for messaging too, but in those cases the
-  // actual tokens are always null (and could be coalesced to 0).
-  return null;
-}
-
-function setCurrentTokens(tokens) {
-  SpreadsheetApp.getActiveSheet()
-    .getRange(LOCATION_A1.TOKENS)
-    // We want to fit as many tokens as possible in the box for any token count
-    .setFontSize(
-      tokens <= 24
-        ? 39 - 3 * Math.ceil(Math.max(0, tokens - 16) / 2)
-        : tokens <= 39
-        ? 25
-        : 21,
-    )
-    // If the value is a number we create a string made up of the token icons
-    .setValue(TOKEN_REPR.repeat(tokens));
 }
 
 function setInstructionsMessage(message) {
@@ -580,29 +559,54 @@ function* groupConsecutiveRuns(numbers) {
   return totalRuns;
 }
 
-function getPlayerTokens() {
-  const {
-    playerTokens,
-  } = PropertiesService.getDocumentProperties().getProperties();
-  if (playerTokens == null || playerTokens == "") {
-    return {};
+function getTokens() {
+  const { tokens } = PropertiesService.getDocumentProperties().getProperties();
+  if (tokens == null || tokens == "") {
+    return null;
   }
 
-  return JSON.parse(playerTokens);
+  console.log(tokens);
+
+  return JSON.parse(tokens);
 }
 
-function setPlayerTokens(playerTokens) {
-  if (playerTokens == null) {
-    PropertiesService.getDocumentProperties().deleteProperty("playerTokens");
+function setTokens(updatedTokens) {
+  if (updatedTokens == null) {
+    SpreadsheetApp.getActive().toast(
+      "Player tokens reset",
+      "Stored game state update",
+    );
+    PropertiesService.getDocumentProperties().deleteProperty("tokens");
     return;
   }
-  const serialized = JSON.stringify(playerTokens);
+
+  const storedTokens = getTokens();
+  if (storedTokens) {
+    if (storedTokens.version !== updatedTokens.version) {
+      throw new Error(
+        `Stored token version ${JSON.stringify(
+          storedTokens,
+        )} is different from the current one ${JSON.stringify(updatedTokens)}`,
+      );
+    }
+    updatedTokens.version++;
+  }
+
+  const totalPlayerTokens = updatedTokens.players.reduce((tot, i) => tot + i);
+  const expected = totalTokensInGame(updatedTokens.players.length);
+  if (updatedTokens.pool + totalPlayerTokens !== expected) {
+    throw new Error(
+      `The total number of tokens in players hands ${totalPlayerTokens} and the tokens in the pool ${poolTokens} don't add up to the expected total number of tokens in the game ${expected}`,
+    );
+  }
+
   PropertiesService.getDocumentProperties().setProperty(
-    "playerTokens",
-    serialized,
+    "tokens",
+    JSON.stringify(updatedTokens),
   );
 
-  renderPlayerTokens(playerTokens, OPTIONS.HIDDEN_TOKENS);
+  renderPlayerTokens(updatedTokens.players, OPTIONS.HIDDEN_TOKENS);
+  renderTokensPool(updatedTokens.pool);
 }
 
 function enableHotspot(location, script) {
@@ -772,15 +776,27 @@ function renderPlayerArea(sheet, players) {
 }
 
 function renderPlayerTokens(playerTokens, isHidden = false) {
-  const numPlayers = Object.keys(playerTokens).length;
   SpreadsheetApp.getActiveSheet()
     .getRange(PLAYER1_A1)
-    .offset(0, PLAYER_NAME_LENGTH, numPlayers, 1)
+    .offset(0, PLAYER_NAME_LENGTH, playerTokens.length, 1)
     .setValues(
-      [...xrange(numPlayers)].map((player) => [
-        isHidden ? "HIDDEN" : playerTokens[player],
-      ]),
+      playerTokens.map((playerTokens) => [isHidden ? "HIDDEN" : playerTokens]),
     );
+}
+
+function renderTokensPool(tokens) {
+  SpreadsheetApp.getActiveSheet()
+    .getRange(LOCATION_A1.TOKENS)
+    // We want to fit as many tokens as possible in the box for any token count
+    .setFontSize(
+      tokens <= 24
+        ? 39 - 3 * Math.ceil(Math.max(0, tokens - 16) / 2)
+        : tokens <= 39
+        ? 25
+        : 21,
+    )
+    // If the value is a number we create a string made up of the token icons
+    .setValue(TOKEN_REPR.repeat(tokens));
 }
 
 function renderFinalScore() {
